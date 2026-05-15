@@ -381,8 +381,10 @@
 
     /* ── RESPONSIVE ─────────────────────────────────────────────────────── */
     @media (max-width: 600px) {
-      header { padding: 1.1rem 1rem; }
-      header h1 { font-size: 1rem; }
+      header { padding: 1rem; flex-wrap: wrap; gap: .5rem; }
+      header h1 { font-size: clamp(1rem, 5vw, 1.3rem); }
+      header p { font-size: .68rem; letter-spacing: .12em; }
+      #import-btn { align-self: flex-start; }
       #month-label { font-size: 1.25rem; }
       .pod-name { font-size: .72rem; }
       .pod-medal { font-size: 1.4rem; }
@@ -398,7 +400,7 @@
 <header>
   <div>
     <h1>La Table des Savoirs</h1>
-    <p>⚔ Tournoi du quiz quotidien ⚔</p>
+    <p>— Tournoi du quiz quotidien —</p>
   </div>
   <button id="import-btn">📥 Importer</button>
 </header>
