@@ -405,6 +405,24 @@
   <button id="import-btn">📥 Importer</button>
 </header>
 
+<!-- PIN modal -->
+<div class="modal-overlay" id="pin-overlay">
+  <div class="modal-box" style="max-width:320px;text-align:center">
+    <span class="corner-br"></span><span class="corner-tl2"></span>
+    <button id="close-pin">✕</button>
+    <p style="font-family:'Cinzel',serif;color:var(--gold);font-size:.9rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:1.2rem">Code d'accès</p>
+    <input id="pin-input" type="password" inputmode="numeric" maxlength="10"
+      style="width:100%;background:var(--bg-raised);border:1px solid var(--red-border);color:var(--text);
+             font-family:'Rajdhani',sans-serif;font-size:1.4rem;letter-spacing:.4em;text-align:center;
+             padding:.6rem .8rem;outline:none;">
+    <p id="pin-error" style="color:var(--red);font-size:.78rem;margin-top:.6rem;min-height:1em;letter-spacing:.05em"></p>
+    <button id="pin-confirm"
+      style="margin-top:.8rem;width:100%;background:var(--red-dark);border:1px solid var(--red-border);
+             color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:700;
+             letter-spacing:.12em;text-transform:uppercase;padding:.6rem 1rem;cursor:pointer;">Confirmer</button>
+  </div>
+</div>
+
 <!-- Import modal -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal-box">
@@ -505,8 +523,32 @@ let sortDir = 1;
 function openModal()  { document.getElementById('modal-overlay').classList.add('open'); }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); hideMsg(); }
 
-document.getElementById('import-btn').addEventListener('click', openModal);
-document.getElementById('empty-start-btn').addEventListener('click', openModal);
+function openPinModal() {
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('pin-input').focus(), 50);
+}
+function closePinModal() { document.getElementById('pin-overlay').classList.remove('open'); }
+
+function checkPin() {
+  if (document.getElementById('pin-input').value === '1988') {
+    closePinModal(); openModal();
+  } else {
+    document.getElementById('pin-error').textContent = 'Code incorrect';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+document.getElementById('import-btn').addEventListener('click', openPinModal);
+document.getElementById('empty-start-btn').addEventListener('click', openPinModal);
+document.getElementById('close-pin').addEventListener('click', closePinModal);
+document.getElementById('pin-confirm').addEventListener('click', checkPin);
+document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPin(); });
+document.getElementById('pin-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('pin-overlay')) closePinModal();
+});
 document.getElementById('close-modal').addEventListener('click', closeModal);
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
