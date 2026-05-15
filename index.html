@@ -684,9 +684,7 @@
       </div>
     </div>
     <div class="ucb-header-actions">
-      <button class="ucb-replay-btn" id="replay-btn">↻ REPLAY INTRO</button>
-      <button class="ucb-settings-btn" id="settings-btn">⚙ RÉGLAGES</button>
-      <div class="ucb-live"><div class="ucb-live-dot"></div>EN DIRECT · WHATSAPP</div>
+<button class="ucb-settings-btn" id="settings-btn">⚙ RÉGLAGES</button>
     </div>
   </header>
 
@@ -1201,9 +1199,6 @@ function playIntro(champ) {
   };
 }
 
-document.getElementById('replay-btn').addEventListener('click', ()=>{
-  if(allStats.length) playIntro(allStats[0]);
-});
 
 /* ── INIT ──────────────────────────────────────────────────────────────── */
 (async function init() {
