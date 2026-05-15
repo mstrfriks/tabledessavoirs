@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Table des Savoirs — Classement</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gold:        #C9A84C;
+      --gold-light:  #E8C96A;
+      --gold-dim:    #8B6914;
+      --gold-bg:     rgba(201,168,76,0.12);
+      --gold-border: rgba(201,168,76,0.35);
+      --bg:          #0D0D1A;
+      --bg-card:     #161625;
+      --bg-raised:   #1F1F35;
+      --bg-hover:    rgba(255,255,255,0.03);
+      --text:        #E2D9C8;
+      --text-muted:  #7A7060;
+      --border:      #252540;
+      --red:         rgba(200,60,60,0.18);
+      --red-border:  rgba(200,60,60,0.45);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── HEADER ───────────────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      padding: 2.5rem 1rem 2rem;
+      background: linear-gradient(180deg, #08080F 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.9rem, 5vw, 3.2rem);
+      color: var(--gold);
+      letter-spacing: 0.06em;
+      text-shadow: 0 0 50px rgba(201,168,76,0.25);
+    }
+    header p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-top: 0.4rem;
+      font-style: italic;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── IMPORT ───────────────────────────────────────────────────────────── */
+    #import-section {
+      max-width: 640px;
+      margin: 2.5rem auto 0;
+      padding: 0 1rem;
+    }
+    #drop-zone {
+      border: 2px dashed var(--gold-dim);
+      border-radius: 14px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      background: var(--bg-card);
+      transition: border-color .25s, background .25s, box-shadow .25s;
+    }
+    #drop-zone.drag-over,
+    #drop-zone:hover {
+      border-color: var(--gold);
+      background: var(--gold-bg);
+      box-shadow: 0 0 40px rgba(201,168,76,0.1);
+    }
+    #drop-zone .dz-icon { font-size: 2.8rem; display: block; margin-bottom: .9rem; }
+    #drop-zone h2 {
+      font-family: 'Playfair Display', serif;
+      color: var(--gold);
+      font-size: 1.3rem;
+      margin-bottom: .45rem;
+    }
+    #drop-zone p { color: var(--text-muted); font-size: .88rem; }
+
+    #browse-btn {
+      display: inline-block;
+      margin-top: 1.3rem;
+      padding: .55rem 1.6rem;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: .88rem;
+      font-weight: 500;
+      letter-spacing: .03em;
+      transition: background .2s, color .2s;
+    }
+    #browse-btn:hover { background: var(--gold); color: var(--bg); }
+    #file-input { display: none; }
+
+    /* ── MESSAGES ─────────────────────────────────────────────────────────── */
+    .msg {
+      display: none;
+      max-width: 640px;
+      margin: 1rem auto 0;
+      padding: .9rem 1.4rem;
+      border-radius: 8px;
+      text-align: center;
+      font-size: .9rem;
+    }
+    #error-msg { background: var(--red); border: 1px solid var(--red-border); color: #ff8888; }
+    #info-msg  { background: var(--gold-bg); border: 1px solid var(--gold-border); color: var(--gold-light);
+                 font-family: 'Playfair Display', serif; font-size: 1rem; }
+
+    /* ── STATS BAR ────────────────────────────────────────────────────────── */
+    #stats-bar {
+      display: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .8rem;
+      max-width: 900px;
+      margin: 2rem auto .5rem;
+      padding: 0 1rem;
+      align-items: center;
+    }
+    .stat-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: .55rem 1.3rem;
+      text-align: center;
+      min-width: 90px;
+    }
+    .stat-chip .slabel {
+      font-size: .72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      display: block;
+    }
+    .stat-chip .svalue {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    #new-file-btn {
+      padding: .45rem 1.2rem;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: .82rem;
+      transition: border-color .2s, color .2s;
+    }
+    #new-file-btn:hover { border-color: var(--gold-dim); color: var(--text); }
+
+    /* ── TABS ─────────────────────────────────────────────────────────────── */
+    #main-content { display: none; }
+    .tabs { max-width: 1100px; margin: 1.5rem auto 0; padding: 0 1rem 3rem; }
+
+    .tab-nav {
+      display: flex;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.6rem;
+      gap: 0;
+    }
+    .tab-btn {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      padding: .8rem 1.8rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color .2s, border-color .2s;
+      letter-spacing: .02em;
+    }
+    .tab-btn.active  { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── TABLE SHARED ─────────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    thead th {
+      background: var(--bg-raised);
+      padding: .85rem 1rem;
+      text-align: left;
+      color: var(--gold);
+      font-family: 'Playfair Display', serif;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+    }
+    thead th:hover { background: #2A2A48; }
+    thead th.sort-asc::after  { content: ' ▲'; font-size: .68em; opacity: .8; }
+    thead th.sort-desc::after { content: ' ▼'; font-size: .68em; opacity: .8; }
+
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--bg-hover); }
+    tbody td { padding: .82rem 1rem; }
+
+    /* ── RANKING TABLE ────────────────────────────────────────────────────── */
+    .rank-cell {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      color: var(--text-muted);
+      width: 3rem;
+      text-align: center;
+    }
+    .points-cell {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .player-cell { font-weight: 500; }
+
+    tr.top-1 { background: rgba(201,168,76,0.08); }
+    tr.top-2 { background: rgba(192,192,192,0.05); }
+    tr.top-3 { background: rgba(205,127,50,0.05); }
+
+    .score-badge {
+      display: inline-block;
+      padding: .18em .55em;
+      border-radius: 5px;
+      font-size: .82rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+    }
+    .sb-10 { background: #173d17; color: #7fd87f; }
+    .sb-9  { background: #163316; color: #6ec86e; }
+    .sb-8  { background: #303a10; color: #a8cc40; }
+    .sb-7  { background: #3d3010; color: #ccaa30; }
+    .sb-lo { background: #3a1515; color: #cc6060; }
+
+    .win-bar { display: flex; align-items: center; gap: .6rem; }
+    .win-bar-bg {
+      flex: 1; height: 5px; background: var(--bg-raised);
+      border-radius: 3px; overflow: hidden; min-width: 35px;
+    }
+    .win-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width .4s; }
+
+    /* ── HISTORY TABLE ────────────────────────────────────────────────────── */
+    #history-pane .date-col {
+      font-family: 'Playfair Display', serif;
+      color: var(--gold);
+      white-space: nowrap;
+      font-size: .88rem;
+    }
+    .hscore {
+      text-align: center;
+      min-width: 68px;
+      white-space: nowrap;
+      font-size: .88rem;
+    }
+    .hscore.winner {
+      background: rgba(201,168,76,0.18);
+      color: var(--gold-light);
+      font-weight: 600;
+      box-shadow: inset 2px 0 0 var(--gold);
+    }
+    .winner-col { color: var(--gold-light); font-size: .85rem; white-space: nowrap; }
+
+    /* ── RESPONSIVE ───────────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.65rem; }
+      .tab-btn  { padding: .7rem 1.1rem; font-size: .95rem; }
+      thead th, tbody td { padding: .7rem .65rem; font-size: .82rem; }
+      .stat-chip .svalue { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>La Table des Savoirs</h1>
+  <p>Classement du quiz quotidien</p>
+</header>
+
+<div id="import-section">
+  <div id="drop-zone">
+    <span class="dz-icon">📜</span>
+    <h2>Importer l'historique</h2>
+    <p>Glissez-déposez votre export WhatsApp (.txt) ici</p>
+    <button id="browse-btn">Parcourir…</button>
+    <input type="file" id="file-input" accept=".txt,text/plain">
+  </div>
+</div>
+
+<div id="error-msg" class="msg"></div>
+<div id="info-msg"  class="msg"></div>
+
+<div id="stats-bar">
+  <div class="stat-chip"><span class="slabel">Joueurs</span><span class="svalue" id="stat-players">—</span></div>
+  <div class="stat-chip"><span class="slabel">Jours</span>  <span class="svalue" id="stat-days">—</span></div>
+  <div class="stat-chip"><span class="slabel">Parties</span><span class="svalue" id="stat-games">—</span></div>
+  <button id="new-file-btn">↩ Changer de fichier</button>
+</div>
+
+<div id="main-content">
+  <div class="tabs">
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="ranking">🏆 Classement</button>
+      <button class="tab-btn"        data-tab="history">📅 Historique</button>
+    </div>
+
+    <div id="ranking-pane" class="tab-pane active">
+      <div class="table-wrap">
+        <table id="ranking-table">
+          <thead>
+            <tr>
+              <th data-col="rank"       class="sort-asc">Rang</th>
+              <th data-col="name">Joueur</th>
+              <th data-col="points">Points</th>
+              <th data-col="daysPlayed">Jours joués</th>
+              <th data-col="bestScore">Meilleur</th>
+              <th data-col="winPct">% Victoires</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="history-pane" class="tab-pane">
+      <div class="table-wrap">
+        <table id="history-table">
+          <thead id="history-head"></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── STATE ──────────────────────────────────────────────────────────────── */
+let rankingData = [];        // [{name,points,daysPlayed,bestScore,wins,winPct}]
+let byDate      = {};        // { 'DD/MM/YYYY': [{player,score}] }
+let dayWinners  = {};        // { 'DD/MM/YYYY': [playerName, ...] }
+let allPlayers  = [];        // ordered by points desc
+
+let sortCol = 'rank';
+let sortDir = 1;             // 1=asc for rank/name, -1=desc for numerics (initial: asc rank = desc points)
+
+/* ── FILE HANDLING ──────────────────────────────────────────────────────── */
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+});
+dropZone.addEventListener('click', e => {
+  if (e.target !== document.getElementById('browse-btn')) fileInput.click();
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+document.getElementById('new-file-btn').addEventListener('click', resetUI);
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const entries = parseWhatsApp(e.target.result);
+    if (!entries.length) {
+      showError('Aucune partie trouvée. Vérifiez que le fichier est bien un export WhatsApp contenant des scores "La Table des Savoirs".');
+      return;
+    }
+    hideMsg();
+    buildRanking(entries);
+    showInfo('✓ ' + entries.length + ' partie' + (entries.length > 1 ? 's' : '') + ' chargée' + (entries.length > 1 ? 's' : '') + ' avec succès');
+  };
+  reader.onerror = () => showError('Impossible de lire le fichier.');
+  reader.readAsText(file, 'UTF-8');
+}
+
+function resetUI() {
+  document.getElementById('import-section').style.display = '';
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('stats-bar').style.display = 'none';
+  hideMsg();
+  fileInput.value = '';
+}
+
+/* ── PARSER ─────────────────────────────────────────────────────────────── */
+function parseMessageStart(line) {
+  // Format A: [DD/MM/YYYY HH:MM:SS] Name: content
+  //           [DD/MM/YYYY, HH:MM:SS] Name: content
+  const fA = line.match(/^\[(\d{2}\/\d{2}\/\d{4})[,\s]+\d{2}:\d{2}(?::\d{2})?\]\s+(.+?):\s+([\s\S]*)$/);
+  if (fA) return { date: fA[1], player: fA[2].trim(), content: fA[3] };
+
+  // Format B: DD/MM/YYYY, HH:MM - Name: content  (older WhatsApp / iOS)
+  const fB = line.match(/^(\d{2}\/\d{2}\/\d{4}),\s+\d{2}:\d{2}\s+-\s+(.+?):\s+([\s\S]*)$/);
+  if (fB) return { date: fB[1], player: fB[2].trim(), content: fB[3] };
+
+  return null;
+}
+
+function isMsgStart(line) { return !!parseMessageStart(line); }
+
+const QUIZ_RE   = /Quiz[^(]*\((\d+)\/10\)/i;
+const TABLE_RE  = /La Table des Savoirs/i;
+
+function parseWhatsApp(text) {
+  const lines   = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const entries = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const msg = parseMessageStart(lines[i]);
+    if (!msg) { i++; continue; }
+
+    // Gather continuation lines (lines that don't start a new message)
+    let j = i + 1;
+    while (j < lines.length && !isMsgStart(lines[j])) j++;
+
+    const full = msg.content + (j > i + 1 ? '\n' + lines.slice(i + 1, j).join('\n') : '');
+
+    if (TABLE_RE.test(full)) {
+      const sm = full.match(QUIZ_RE);
+      if (sm) {
+        entries.push({
+          date:   msg.date,
+          player: normalizePlayer(msg.player),
+          score:  parseInt(sm[1], 10)
+        });
+      }
+    }
+
+    i = j;
+  }
+
+  return entries;
+}
+
+function normalizePlayer(name) {
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/* ── RANKING COMPUTATION ─────────────────────────────────────────────────── */
+function buildRanking(entries) {
+  // Best score per (date, player)
+  const bestMap = {};
+  for (const e of entries) {
+    const k = e.date + '||' + e.player;
+    if (!bestMap[k] || e.score > bestMap[k].score) bestMap[k] = e;
+  }
+
+  byDate     = {};
+  dayWinners = {};
+
+  for (const e of Object.values(bestMap)) {
+    (byDate[e.date] = byDate[e.date] || []).push(e);
+  }
+
+  const pmap = {};
+
+  for (const [date, dayEntries] of Object.entries(byDate)) {
+    const maxScore = Math.max(...dayEntries.map(e => e.score));
+    const winners  = dayEntries.filter(e => e.score === maxScore).map(e => e.player);
+    dayWinners[date] = winners;
+
+    for (const e of dayEntries) {
+      if (!pmap[e.player]) pmap[e.player] = { name: e.player, points: 0, daysPlayed: 0, bestScore: 0, wins: 0, totalScore: 0 };
+      const p = pmap[e.player];
+      p.daysPlayed++;
+      p.bestScore   = Math.max(p.bestScore, e.score);
+      p.totalScore += e.score;
+      if (winners.includes(e.player)) { p.points++; p.wins++; }
+    }
+  }
+
+  rankingData = Object.values(pmap).map(p => ({
+    ...p,
+    winPct:   p.daysPlayed ? Math.round(100 * p.wins / p.daysPlayed) : 0,
+    avgScore: p.daysPlayed ? +(p.totalScore / p.daysPlayed).toFixed(1) : 0
+  }));
+
+  // Default display order: points desc then name asc
+  allPlayers = [...rankingData].sort((a,b) => b.points - a.points || a.name.localeCompare(b.name, 'fr')).map(p => p.name);
+
+  // Stats
+  document.getElementById('stat-players').textContent = rankingData.length;
+  document.getElementById('stat-days').textContent    = Object.keys(byDate).length;
+  document.getElementById('stat-games').textContent   = Object.values(bestMap).length;
+
+  renderRanking();
+  renderHistory();
+
+  document.getElementById('stats-bar').style.display   = 'flex';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('import-section').style.display = 'none';
+}
+
+/* ── RANK MAP ────────────────────────────────────────────────────────────── */
+function buildRankMap() {
+  const sorted = [...rankingData].sort((a,b) => b.points - a.points || a.name.localeCompare(b.name,'fr'));
+  const map = {};
+  let rank = 1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i].points < sorted[i-1].points) rank = i + 1;
+    map[sorted[i].name] = rank;
+  }
+  return map;
+}
+
+/* ── RENDER RANKING ──────────────────────────────────────────────────────── */
+const MEDALS = ['🥇','🥈','🥉'];
+
+function renderRanking() {
+  const rankMap = buildRankMap();
+
+  const sorted = [...rankingData].sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'rank')       { va = rankMap[a.name]; vb = rankMap[b.name]; }
+    else if (sortCol === 'name')  { return sortDir * a.name.localeCompare(b.name, 'fr'); }
+    else                          { va = a[sortCol]; vb = b[sortCol]; }
+    if (va !== vb) return sortDir * (va - vb);
+    return a.name.localeCompare(b.name, 'fr');
+  });
+
+  // Update sort indicators
+  document.querySelectorAll('#ranking-table thead th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+
+  document.getElementById('ranking-body').innerHTML = sorted.map(p => {
+    const rank  = rankMap[p.name];
+    const medal = rank <= 3 ? MEDALS[rank - 1] : '';
+    const rowCls = rank <= 3 ? ' class="top-' + rank + '"' : '';
+    return `<tr${rowCls}>
+      <td class="rank-cell">${medal || rank}</td>
+      <td class="player-cell">${esc(p.name)}</td>
+      <td class="points-cell">${p.points}</td>
+      <td>${p.daysPlayed}</td>
+      <td>${scoreBadge(p.bestScore)}</td>
+      <td><div class="win-bar"><span>${p.winPct}%</span>
+        <div class="win-bar-bg"><div class="win-bar-fill" style="width:${p.winPct}%"></div></div>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function scoreBadge(s) {
+  const cls = s === 10 ? 'sb-10' : s === 9 ? 'sb-9' : s >= 8 ? 'sb-8' : s >= 7 ? 'sb-7' : 'sb-lo';
+  return `<span class="score-badge ${cls}">${s}/10</span>`;
+}
+
+/* ── RENDER HISTORY ──────────────────────────────────────────────────────── */
+function renderHistory() {
+  const dates = Object.keys(byDate).sort((a,b) => dateKey(b) - dateKey(a));
+
+  document.getElementById('history-head').innerHTML =
+    '<tr><th style="cursor:default">Date</th>' +
+    allPlayers.map(p => `<th style="cursor:default">${esc(p)}</th>`).join('') +
+    '<th style="cursor:default">Vainqueur(s)</th></tr>';
+
+  document.getElementById('history-body').innerHTML = dates.map(date => {
+    const scoreOf = {};
+    for (const e of byDate[date]) scoreOf[e.player] = e.score;
+    const winners = dayWinners[date];
+
+    const cells = allPlayers.map(p => {
+      if (scoreOf[p] == null) return `<td class="hscore"></td>`;
+      const win = winners.includes(p);
+      return `<td class="hscore${win?' winner':''}">${scoreOf[p]}/10</td>`;
+    }).join('');
+
+    return `<tr>
+      <td class="date-col">${formatDate(date)}</td>
+      ${cells}
+      <td class="winner-col">${winners.map(esc).join(', ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── SORT HANDLER ────────────────────────────────────────────────────────── */
+document.querySelectorAll('#ranking-table thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) {
+      sortDir *= -1;
+    } else {
+      sortCol = col;
+      sortDir = (col === 'name') ? 1 : (col === 'rank') ? 1 : -1;
+    }
+    renderRanking();
+  });
+});
+
+/* ── TABS ────────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === tab + '-pane'));
+  });
+});
+
+/* ── UTILITIES ───────────────────────────────────────────────────────────── */
+function dateKey(s) {
+  const [d,m,y] = s.split('/');
+  return parseInt(y+m+d, 10);
+}
+
+const MONTHS_FR = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+function formatDate(s) {
+  const [d,m,y] = s.split('/');
+  return `${parseInt(d,10)} ${MONTHS_FR[parseInt(m,10)-1]} ${y}`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('info-msg').style.display = 'none';
+}
+function showInfo(msg) {
+  const el = document.getElementById('info-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('error-msg').style.display = 'none';
+}
+function hideMsg() {
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('info-msg').style.display  = 'none';
+}
+</script>
+</body>
+</html>
