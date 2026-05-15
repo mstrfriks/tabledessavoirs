@@ -149,18 +149,26 @@
       color: var(--gold);
       font-weight: 700;
     }
-    #new-file-btn {
+    #new-file-btn, #clear-btn {
       padding: .45rem 1.2rem;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
       border-radius: 7px;
       background: transparent;
       cursor: pointer;
       font-family: 'Inter', sans-serif;
       font-size: .82rem;
+    }
+    #new-file-btn {
+      border: 1px solid var(--border);
+      color: var(--text-muted);
       transition: border-color .2s, color .2s;
     }
     #new-file-btn:hover { border-color: var(--gold-dim); color: var(--text); }
+    #clear-btn {
+      border: 1px solid rgba(200,60,60,0.35);
+      color: rgba(220,100,100,0.8);
+      transition: background .2s, border-color .2s, color .2s;
+    }
+    #clear-btn:hover { background: rgba(200,60,60,0.1); border-color: rgba(200,60,60,0.6); color: #ff8888; }
 
     /* ── TABS ─────────────────────────────────────────────────────────────── */
     #main-content { display: none; }
@@ -314,7 +322,8 @@
   <div class="stat-chip"><span class="slabel">Joueurs</span><span class="svalue" id="stat-players">—</span></div>
   <div class="stat-chip"><span class="slabel">Jours</span>  <span class="svalue" id="stat-days">—</span></div>
   <div class="stat-chip"><span class="slabel">Parties</span><span class="svalue" id="stat-games">—</span></div>
-  <button id="new-file-btn">↩ Changer de fichier</button>
+  <button id="new-file-btn">＋ Ajouter un fichier</button>
+  <button id="clear-btn">✕ Effacer tout</button>
 </div>
 
 <div id="main-content">
@@ -376,30 +385,51 @@ dropZone.addEventListener('drop', e => {
 dropZone.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
-document.getElementById('new-file-btn').addEventListener('click', resetUI);
+document.getElementById('new-file-btn').addEventListener('click', () => fileInput.click());
+document.getElementById('clear-btn').addEventListener('click', clearData);
 
-function processFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const entries = parseWhatsApp(e.target.result);
-    if (!entries.length) {
-      showError('Aucune partie trouvée. Vérifiez que le fichier est bien un export WhatsApp contenant des scores "La Table des Savoirs".');
-      return;
-    }
-    hideMsg();
-    buildRanking(entries);
-    showInfo('✓ ' + entries.length + ' partie' + (entries.length > 1 ? 's' : '') + ' chargée' + (entries.length > 1 ? 's' : '') + ' avec succès');
-  };
-  reader.onerror = () => showError('Impossible de lire le fichier.');
-  reader.readAsText(file, 'UTF-8');
+/* ── PERSISTENCE ─────────────────────────────────────────────────────────── */
+const STORAGE_KEY = 'tds_v1';
+function saveEntries(entries) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch(e) {}
+}
+function loadEntries() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
 }
 
-function resetUI() {
+function clearData() {
+  if (!confirm('Effacer toutes les données sauvegardées ?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  rankingData = []; byDate = {}; dayWinners = {}; allPlayers = [];
   document.getElementById('import-section').style.display = '';
   document.getElementById('main-content').style.display = 'none';
   document.getElementById('stats-bar').style.display = 'none';
   hideMsg();
   fileInput.value = '';
+}
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const newEntries = parseWhatsApp(e.target.result);
+    if (!newEntries.length) {
+      showError('Aucune partie trouvée. Vérifiez que le fichier est bien un export WhatsApp contenant des scores "La Table des Savoirs".');
+      return;
+    }
+    // Merge with stored entries, then rebuild
+    const stored = loadEntries();
+    buildRanking([...stored, ...newEntries]);
+    hideMsg();
+    const total = parseInt(document.getElementById('stat-games').textContent, 10);
+    const prev  = stored.length;
+    const added = total - prev;
+    const msg = added > 0
+      ? `✓ ${added} nouvelle(s) partie(s) ajoutée(s) · ${total} au total`
+      : `✓ Fichier traité — aucune nouvelle partie (${total} au total)`;
+    showInfo(msg);
+  };
+  reader.onerror = () => showError('Impossible de lire le fichier.');
+  reader.readAsText(file, 'UTF-8');
 }
 
 /* ── PARSER ─────────────────────────────────────────────────────────────── */
@@ -472,6 +502,9 @@ function buildRanking(entries) {
     const k = e.date + '||' + e.player;
     if (!bestMap[k] || e.score > bestMap[k].score) bestMap[k] = e;
   }
+
+  // Persist deduplicated entries
+  saveEntries(Object.values(bestMap));
 
   byDate     = {};
   dayWinners = {};
@@ -655,6 +688,15 @@ function hideMsg() {
   document.getElementById('error-msg').style.display = 'none';
   document.getElementById('info-msg').style.display  = 'none';
 }
+
+/* ── RESTORE ON LOAD ─────────────────────────────────────────────────────── */
+(function init() {
+  const stored = loadEntries();
+  if (stored.length) {
+    buildRanking(stored);
+    showInfo('✓ Données restaurées — ' + stored.length + ' partie(s)');
+  }
+})();
 </script>
 </body>
 </html>
