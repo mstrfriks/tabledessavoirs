@@ -29,24 +29,28 @@
 
     body {
       font-family: 'Rajdhani', sans-serif;
-      background: var(--bg); color: var(--text);
-      min-height: 100vh; overflow-x: hidden;
+      color: var(--text); min-height: 100vh; overflow-x: hidden;
+      background:
+        radial-gradient(ellipse 160% 55% at 50% 108%, rgba(180,8,0,.55) 0%, rgba(90,0,0,.25) 38%, transparent 58%),
+        radial-gradient(ellipse 55% 90% at -4%  55%, rgba(120,0,30,.3)  0%, transparent 55%),
+        radial-gradient(ellipse 55% 90% at 104% 55%, rgba(120,0,30,.3)  0%, transparent 55%),
+        radial-gradient(ellipse 90% 55% at 50%  -5%, rgba(12,0,22,.8)   0%, transparent 60%),
+        #040003;
     }
 
     /* Scanlines */
     body::after {
       content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
-      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,.12) 3px, rgba(0,0,0,.12) 4px);
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,.10) 3px, rgba(0,0,0,.10) 4px);
     }
 
-    /* Dragon watermark */
+    /* Vignette */
     body::before {
-      content: '🐉'; position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      font-size: clamp(18rem, 40vw, 32rem);
-      opacity: .025; pointer-events: none; z-index: 0;
-      filter: grayscale(1);
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0,0,0,.65) 100%);
     }
+
+    #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
     /* ── HEADER ─────────────────────────────────────────────────────────── */
     header {
@@ -388,6 +392,8 @@
   </style>
 </head>
 <body>
+
+<canvas id="bg-canvas"></canvas>
 
 <header>
   <div>
@@ -912,6 +918,111 @@ function dateToInt(s) { const [d,m,y] = s.split('/'); return parseInt(y+m+d,10);
 const MONTHS_FR = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
 function formatDate(s) { const [d,m,y] = s.split('/'); return `${parseInt(d,10)} ${MONTHS_FR[parseInt(m,10)-1]} ${y}`; }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── BACKGROUND PARTICLES ────────────────────────────────────────────────── */
+(function () {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H;
+
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* Particle types:
+     'ember'  – orange/red sparks drifting up        (most common)
+     'wisp'   – large faint smoke puffs              (atmospheric)
+     'spark'  – tiny bright white flash              (rare, fleeting)  */
+  class P {
+    constructor(type) { this.type = type; this.init(); }
+
+    init() {
+      const t = this.type;
+      this.x  = Math.random() * W;
+      this.y  = t === 'spark' ? Math.random() * H : H + Math.random() * 60;
+
+      if (t === 'ember') {
+        this.r        = Math.random() * 1.6 + .4;
+        this.vy       = -(Math.random() * 1.1 + .35);
+        this.vx       = (Math.random() - .5) * .5;
+        this.hue      = Math.random() * 35 + 5;   // 5–40 → red-orange
+        this.sat      = 100;
+        this.maxAlpha = Math.random() * .55 + .15;
+        this.maxLife  = Math.random() * 220 + 120;
+        this.wobble   = Math.random() * .08 + .03;
+      } else if (t === 'wisp') {
+        this.r        = Math.random() * 18 + 10;
+        this.vy       = -(Math.random() * .35 + .1);
+        this.vx       = (Math.random() - .5) * .25;
+        this.hue      = Math.random() * 20;        // deep red
+        this.sat      = 60;
+        this.maxAlpha = Math.random() * .07 + .02;
+        this.maxLife  = Math.random() * 300 + 200;
+        this.wobble   = Math.random() * .02;
+      } else {                                     // spark
+        this.r        = Math.random() * .8 + .2;
+        this.vy       = -(Math.random() * 3 + 1);
+        this.vx       = (Math.random() - .5) * 2;
+        this.hue      = Math.random() * 50 + 30;  // yellow-orange
+        this.sat      = 100;
+        this.maxAlpha = 1;
+        this.maxLife  = Math.random() * 40 + 15;
+        this.wobble   = 0;
+      }
+
+      this.life  = t === 'wisp' ? Math.random() * this.maxLife : 0;
+      this.alpha = 0;
+    }
+
+    update() {
+      this.life++;
+      const prog = this.life / this.maxLife;
+      // Fade in for first 20%, fade out for last 40%
+      const a = prog < .2 ? prog / .2 : prog > .6 ? (1 - prog) / .4 : 1;
+      this.alpha = a * this.maxAlpha;
+      this.x += this.vx + Math.sin(this.life * this.wobble) * .4;
+      this.y += this.vy;
+      if (this.life >= this.maxLife) this.init();
+    }
+
+    draw() {
+      if (this.alpha <= 0) return;
+      const { x, y, r, hue, sat, alpha } = this;
+      ctx.save();
+      ctx.globalCompositeOperation = this.type === 'wisp' ? 'screen' : 'lighter';
+      if (this.type === 'wisp') {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, `hsla(${hue},${sat}%,40%,${alpha})`);
+        g.addColorStop(1, `hsla(${hue},${sat}%,20%,0)`);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = g; ctx.fill();
+      } else {
+        ctx.shadowBlur = r * 8;
+        ctx.shadowColor = `hsla(${hue},100%,60%,${alpha})`;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue},100%,75%,${alpha})`;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Spawn pool: 55 embers, 20 wisps, 8 sparks
+  const pool = [
+    ...Array.from({length: 55}, () => new P('ember')),
+    ...Array.from({length: 20}, () => new P('wisp')),
+    ...Array.from({length:  8}, () => new P('spark')),
+  ];
+  // Stagger starting positions
+  pool.forEach(p => { p.life = Math.random() * p.maxLife * .8; });
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    pool.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
 
 /* ── INIT ────────────────────────────────────────────────────────────────── */
 (async function init() {
