@@ -404,13 +404,13 @@ function resetUI() {
 
 /* ── PARSER ─────────────────────────────────────────────────────────────── */
 function parseMessageStart(line) {
-  // Format A: [DD/MM/YYYY HH:MM:SS] Name: content
+  // Format A: [DD/MM/YYYY HH:MM:SS] Name: content (content may be empty)
   //           [DD/MM/YYYY, HH:MM:SS] Name: content
-  const fA = line.match(/^\[(\d{2}\/\d{2}\/\d{4})[,\s]+\d{2}:\d{2}(?::\d{2})?\]\s+(.+?):\s+([\s\S]*)$/);
+  const fA = line.match(/^\[(\d{2}\/\d{2}\/\d{4})[,\s]+\d{2}:\d{2}(?::\d{2})?\]\s+(.+?):\s*([\s\S]*)$/);
   if (fA) return { date: fA[1], player: fA[2].trim(), content: fA[3] };
 
   // Format B: DD/MM/YYYY, HH:MM - Name: content  (older WhatsApp / iOS)
-  const fB = line.match(/^(\d{2}\/\d{2}\/\d{4}),\s+\d{2}:\d{2}\s+-\s+(.+?):\s+([\s\S]*)$/);
+  const fB = line.match(/^(\d{2}\/\d{2}\/\d{4}),\s+\d{2}:\d{2}\s+-\s+(.+?):\s*([\s\S]*)$/);
   if (fB) return { date: fB[1], player: fB[2].trim(), content: fB[3] };
 
   return null;
@@ -422,7 +422,14 @@ const QUIZ_RE   = /Quiz[^(]*\((\d+)\/10\)/i;
 const TABLE_RE  = /La Table des Savoirs/i;
 
 function parseWhatsApp(text) {
-  const lines   = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  // Strip BOM, normalize line endings, then strip invisible directional marks
+  // (U+200E, U+200F, U+202x, U+FEFF) that WhatsApp injects at line starts
+  const lines = text
+    .replace(/^﻿/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/^[‎‏‪-‮⁦-⁩﻿]+/, ''));
   const entries = [];
   let i = 0;
 
