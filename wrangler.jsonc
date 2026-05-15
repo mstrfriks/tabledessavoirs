@@ -9,6 +9,9 @@
   "assets": {
     "directory": "."
   },
+  "kv_namespaces": [
+    { "binding": "TDS_KV", "id": "a9f59a16db264a5f8ecd8965ce23b451" }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ]
