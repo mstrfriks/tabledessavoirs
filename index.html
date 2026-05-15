@@ -72,7 +72,7 @@
       color: var(--text-muted); font-size: .78rem;
       letter-spacing: .2em; text-transform: uppercase; margin-top: .25rem;
     }
-    #import-btn {
+    #settings-btn {
       flex-shrink: 0; font-family: 'Rajdhani', sans-serif; font-weight: 700;
       font-size: .82rem; letter-spacing: .1em; text-transform: uppercase;
       padding: .5rem 1.2rem; background: transparent;
@@ -80,7 +80,44 @@
       cursor: pointer; transition: background .2s, color .2s, border-color .2s;
       clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
     }
-    #import-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
+    #settings-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
+
+    /* ── SETTINGS TABS ──────────────────────────────────────────────────────── */
+    .stab-nav { display: flex; border-bottom: 1px solid var(--red-border); margin-bottom: 1.4rem; }
+    .stab-btn {
+      font-family: 'Rajdhani', sans-serif; font-size: .85rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      padding: .6rem 1.4rem; background: none; border: none;
+      color: var(--text-muted); cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .2s, border-color .2s;
+    }
+    .stab-btn.active { color: var(--red); border-bottom-color: var(--red); }
+    .stab-btn:hover:not(.active) { color: var(--text); }
+    .stab-pane { display: none; }
+    .stab-pane.active { display: block; }
+
+    /* ── PLAYERS LIST ────────────────────────────────────────────────────────── */
+    .player-row { display: flex; align-items: center; gap: .8rem; }
+    .player-row .orig-name {
+      flex: 1; color: var(--text-muted); font-size: .8rem;
+      font-family: 'Rajdhani', sans-serif; letter-spacing: .04em; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .player-row input {
+      flex: 1.5; background: var(--bg-raised); border: 1px solid var(--red-border);
+      color: var(--text); font-family: 'Rajdhani', sans-serif;
+      font-size: .88rem; padding: .4rem .6rem; outline: none; min-width: 0;
+      transition: border-color .2s;
+    }
+    .player-row input:focus { border-color: var(--gold-border); }
+    #save-names-btn {
+      width: 100%; background: var(--red-dark); border: 1px solid var(--red-border);
+      color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: .88rem;
+      font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      padding: .6rem 1rem; cursor: pointer; transition: background .2s;
+    }
+    #save-names-btn:hover { background: var(--red); }
 
     /* ── MODAL ──────────────────────────────────────────────────────────── */
     .modal-overlay {
@@ -384,7 +421,7 @@
       header { padding: 1rem; flex-wrap: wrap; gap: .5rem; }
       header h1 { font-size: clamp(1rem, 5vw, 1.3rem); }
       header p { font-size: .68rem; letter-spacing: .12em; }
-      #import-btn { align-self: flex-start; }
+      #settings-btn { align-self: flex-start; }
       #month-label { font-size: 1.25rem; }
       .pod-name { font-size: .72rem; }
       .pod-medal { font-size: 1.4rem; }
@@ -402,7 +439,7 @@
     <h1>La Table des Savoirs</h1>
     <p>— Tournoi du quiz quotidien —</p>
   </div>
-  <button id="import-btn">📥 Importer</button>
+  <button id="settings-btn">⚙ Réglages</button>
 </header>
 
 <!-- PIN modal -->
@@ -423,22 +460,34 @@
   </div>
 </div>
 
-<!-- Import modal -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal-box">
+<!-- Settings modal -->
+<div class="modal-overlay" id="settings-overlay">
+  <div class="modal-box" style="max-width:560px">
     <span class="corner-br"></span><span class="corner-tl2"></span>
-    <button id="close-modal">✕</button>
-    <div id="drop-zone">
-      <span class="dz-icon">📜</span>
-      <h2>Importer un export WhatsApp</h2>
-      <p>Glissez-déposez votre fichier .txt ici</p>
-      <button id="browse-btn">Parcourir…</button>
-      <input type="file" id="file-input" accept=".txt,text/plain">
+    <button id="close-settings">✕</button>
+    <div class="stab-nav">
+      <button class="stab-btn active" data-stab="import">📥 Importer</button>
+      <button class="stab-btn" data-stab="players">👥 Joueurs</button>
     </div>
-    <div id="error-msg" class="msg"></div>
-    <div id="info-msg"  class="msg"></div>
-    <div class="modal-footer">
-      <button id="clear-btn">✕ Effacer toutes les données</button>
+    <div id="stab-import" class="stab-pane active">
+      <div id="drop-zone">
+        <span class="dz-icon">📜</span>
+        <h2>Importer un export WhatsApp</h2>
+        <p>Glissez-déposez votre fichier .txt ici</p>
+        <button id="browse-btn">Parcourir…</button>
+        <input type="file" id="file-input" accept=".txt,text/plain">
+      </div>
+      <div id="error-msg" class="msg"></div>
+      <div id="info-msg"  class="msg"></div>
+      <div class="modal-footer">
+        <button id="clear-btn">✕ Effacer toutes les données</button>
+      </div>
+    </div>
+    <div id="stab-players" class="stab-pane">
+      <p style="color:var(--text-muted);font-size:.8rem;letter-spacing:.06em;margin-bottom:1rem">Définissez le nom affiché pour chaque joueur. Laissez vide pour utiliser le nom original.</p>
+      <div id="players-list" style="display:flex;flex-direction:column;gap:.6rem;max-height:320px;overflow-y:auto;margin-bottom:1rem;padding-right:.3rem"></div>
+      <button id="save-names-btn">Sauvegarder</button>
+      <p id="names-saved-msg" style="display:none;color:var(--gold);font-size:.8rem;text-align:center;margin-top:.6rem;letter-spacing:.08em">✓ Noms sauvegardés</p>
     </div>
   </div>
 </div>
@@ -515,14 +564,24 @@ let byDate        = {};   // { 'DD/MM/YYYY': [{player,score}] }
 let dayWinners    = {};   // { 'DD/MM/YYYY': [playerName] }
 let availMonths   = [];   // ['MM/YYYY', ...] asc chronological
 let curMonthIdx   = 0;    // index into availMonths
+let nameMap       = {};   // { 'ORIGINAL NAME': 'Display name' }
 
 let sortCol = 'rank';
 let sortDir = 1;
 
-/* ── MODAL ───────────────────────────────────────────────────────────────── */
-function openModal()  { document.getElementById('modal-overlay').classList.add('open'); }
-function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); hideMsg(); }
+function displayName(player) { return nameMap[player] || player; }
 
+/* ── SETTINGS MODAL ──────────────────────────────────────────────────────── */
+function openSettings(tab) {
+  tab = tab || 'import';
+  document.querySelectorAll('.stab-btn').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
+  document.querySelectorAll('.stab-pane').forEach(p => p.classList.toggle('active', p.id === 'stab-' + tab));
+  if (tab === 'players') renderPlayersSettings();
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); hideMsg(); }
+
+/* ── PIN MODAL ───────────────────────────────────────────────────────────── */
 function openPinModal() {
   document.getElementById('pin-input').value = '';
   document.getElementById('pin-error').textContent = '';
@@ -533,7 +592,7 @@ function closePinModal() { document.getElementById('pin-overlay').classList.remo
 
 function checkPin() {
   if (document.getElementById('pin-input').value === '1988') {
-    closePinModal(); openModal();
+    closePinModal(); openSettings('import');
   } else {
     document.getElementById('pin-error').textContent = 'Code incorrect';
     document.getElementById('pin-input').value = '';
@@ -541,7 +600,7 @@ function checkPin() {
   }
 }
 
-document.getElementById('import-btn').addEventListener('click', openPinModal);
+document.getElementById('settings-btn').addEventListener('click', openPinModal);
 document.getElementById('empty-start-btn').addEventListener('click', openPinModal);
 document.getElementById('close-pin').addEventListener('click', closePinModal);
 document.getElementById('pin-confirm').addEventListener('click', checkPin);
@@ -549,9 +608,49 @@ document.getElementById('pin-input').addEventListener('keydown', e => { if (e.ke
 document.getElementById('pin-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('pin-overlay')) closePinModal();
 });
-document.getElementById('close-modal').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
+document.getElementById('close-settings').addEventListener('click', closeSettings);
+document.getElementById('settings-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('settings-overlay')) closeSettings();
+});
+
+/* ── SETTINGS TABS ───────────────────────────────────────────────────────── */
+document.querySelectorAll('.stab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.stab;
+    document.querySelectorAll('.stab-btn').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
+    document.querySelectorAll('.stab-pane').forEach(p => p.classList.toggle('active', p.id === 'stab-' + tab));
+    if (tab === 'players') renderPlayersSettings();
+  });
+});
+
+/* ── PLAYERS SETTINGS ────────────────────────────────────────────────────── */
+function renderPlayersSettings() {
+  const names = [...new Set(Object.values(byDate).flat().map(e => e.player))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const container = document.getElementById('players-list');
+  if (!names.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center">Aucun joueur — importez d\'abord des données.</p>';
+    return;
+  }
+  container.innerHTML = names.map(name => `
+    <div class="player-row">
+      <span class="orig-name" title="${esc(name)}">${esc(name)}</span>
+      <input type="text" data-original="${esc(name)}" value="${esc(nameMap[name] || '')}" placeholder="${esc(name)}">
+    </div>`).join('');
+}
+
+document.getElementById('save-names-btn').addEventListener('click', async () => {
+  const newMap = {};
+  document.querySelectorAll('#players-list input[data-original]').forEach(input => {
+    const orig = input.dataset.original;
+    const val  = input.value.trim();
+    if (val && val !== orig) newMap[orig] = val;
+  });
+  nameMap = newMap;
+  await saveNameMap(nameMap);
+  if (availMonths.length) { renderCurrentMonth(); renderArchives(); }
+  const msg = document.getElementById('names-saved-msg');
+  msg.style.display = 'block';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
 });
 
 /* ── FILE HANDLING ───────────────────────────────────────────────────────── */
@@ -570,16 +669,18 @@ document.getElementById('clear-btn').addEventListener('click', clearData);
 
 /* ── PERSISTENCE ─────────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'tds_v1';
+const MAP_KEY     = 'tds_namemap_v1';
 
-function lsSet(e) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); } catch(_) {} }
-function lsGet()  { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(_) { return []; } }
+function lsSet(e)    { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); } catch(_) {} }
+function lsGet()     { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(_) { return []; } }
+function lsMapSet(m) { try { localStorage.setItem(MAP_KEY, JSON.stringify(m)); } catch(_) {} }
+function lsMapGet()  { try { return JSON.parse(localStorage.getItem(MAP_KEY) || '{}'); } catch(_) { return {}; } }
 
 async function saveEntries(entries) {
   lsSet(entries);
   try {
     await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entries)
     });
   } catch(_) {}
@@ -588,12 +689,27 @@ async function saveEntries(entries) {
 async function loadEntries() {
   try {
     const r = await fetch('/api/data');
-    if (r.ok) {
-      const d = await r.json();
-      if (Array.isArray(d)) { lsSet(d); return d; }
-    }
+    if (r.ok) { const d = await r.json(); if (Array.isArray(d)) { lsSet(d); return d; } }
   } catch(_) {}
   return lsGet();
+}
+
+async function saveNameMap(map) {
+  lsMapSet(map);
+  try {
+    await fetch('/api/namemap', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(map)
+    });
+  } catch(_) {}
+}
+
+async function loadNameMap() {
+  try {
+    const r = await fetch('/api/namemap');
+    if (r.ok) { const d = await r.json(); if (d && typeof d === 'object' && !Array.isArray(d)) { lsMapSet(d); return d; } }
+  } catch(_) {}
+  return lsMapGet();
 }
 
 /* ── PARSER ──────────────────────────────────────────────────────────────── */
@@ -767,7 +883,7 @@ function renderPodium(ranking) {
     return `<div class="pod-slot ${slot.cls}">
       <div class="pod-info">
         <div class="pod-medal">${slot.medal}</div>
-        ${players.map(p => `<div class="pod-name">${esc(p.name)}</div>`).join('')}
+        ${players.map(p => `<div class="pod-name">${esc(displayName(p.name))}</div>`).join('')}
         <div class="pod-pts">${pts} pt${pts > 1 ? 's' : ''}</div>
       </div>
       <div class="pod-stand" style="height:${slot.height}px"></div>
@@ -797,7 +913,7 @@ function renderMonthRanking(ranking) {
     const medal = rank <= 3 ? MEDALS[rank-1] : '';
     return `<tr${rank<=3?' class="top-'+rank+'"':''}>
       <td class="rank-cell">${medal||rank}</td>
-      <td class="player-cell">${esc(p.name)}</td>
+      <td class="player-cell">${esc(displayName(p.name))}</td>
       <td class="points-cell">${p.points}</td>
       <td>${p.daysPlayed}</td>
       <td>${scoreBadge(p.bestScore)}</td>
@@ -819,7 +935,7 @@ function renderMonthHistory(mk, dates) {
 
   document.getElementById('history-head').innerHTML =
     '<tr><th style="cursor:default">Date</th>' +
-    players.map(p => `<th style="cursor:default">${esc(p)}</th>`).join('') +
+    players.map(p => `<th style="cursor:default">${esc(displayName(p))}</th>`).join('') +
     '<th style="cursor:default">Vainqueur(s)</th></tr>';
 
   document.getElementById('history-body').innerHTML = dates.map(date => {
@@ -833,7 +949,7 @@ function renderMonthHistory(mk, dates) {
     return `<tr>
       <td class="date-col">${formatDate(date)}</td>
       ${cells}
-      <td class="winner-col">${winners.map(esc).join(', ')}</td>
+      <td class="winner-col">${winners.map(w => esc(displayName(w))).join(', ')}</td>
     </tr>`;
   }).join('');
 }
@@ -860,7 +976,7 @@ function renderArchives() {
       <div class="archive-podium">
         ${top3.map((p, ri) => `<div class="archive-row">
           <span class="arc-medal">${ARC_MEDALS[rankMap[p.name]-1]||''}</span>
-          <span class="arc-name">${esc(p.name)}</span>
+          <span class="arc-name">${esc(displayName(p.name))}</span>
           <span class="arc-pts">${p.points}pt</span>
         </div>`).join('')}
       </div>
@@ -935,7 +1051,7 @@ async function clearData() {
   document.getElementById('main-content').style.display = 'none';
   document.getElementById('archives-section').style.display = 'none';
   document.getElementById('empty-state').style.display = 'flex';
-  closeModal();
+  closeSettings();
 }
 
 /* ── UI HELPERS ──────────────────────────────────────────────────────────── */
@@ -1070,7 +1186,8 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 /* ── INIT ────────────────────────────────────────────────────────────────── */
 (async function init() {
-  const stored = await loadEntries();
+  const [stored, map] = await Promise.all([loadEntries(), loadNameMap()]);
+  nameMap = map;
   if (stored.length) {
     await buildRanking(stored);
   } else {
