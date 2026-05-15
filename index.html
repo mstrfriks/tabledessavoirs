@@ -768,7 +768,7 @@ function computeStats() {
     const wins    = allDays.filter(d => (dayWinners[d] || []).includes(name)).length;
     return { name, series, total, avg, best, played: played.length, wins };
   });
-  allStats.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
+  allStats.sort((a, b) => b.wins - a.wins || b.total - a.total || a.name.localeCompare(b.name, 'fr'));
   allStats.forEach((s, i) => s.rank = i + 1);
 }
 
@@ -936,7 +936,7 @@ function computeSeasonStats(mk) {
     const best   = played.length ? Math.max(...played) : 0;
     const wins   = days.filter(d=>(dayWinners[d]||[]).includes(name)).length;
     return { name, series, total, avg, best, played:played.length, wins, days:days.length };
-  }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'))
+  }).sort((a,b)=>b.wins-a.wins||b.total-a.total||a.name.localeCompare(b.name,'fr'))
     .map((s,i)=>({...s, rank:i+1}));
 }
 
