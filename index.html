@@ -82,7 +82,7 @@
       text-shadow: 0 0 80px rgba(245,220,0,.6), 8px 8px 0 var(--danger);
       opacity: 0;
     }
-    .intro-logo.p1 { animation: iLogoIn  .5s cubic-bezier(.2,1.6,.4,1) forwards; }
+    .intro-logo.p1 { animation: iLogoIn  .8s cubic-bezier(.2,1.6,.4,1) forwards; }
     .intro-logo.p2 { animation: iLogoOut .4s cubic-bezier(.6,0,.4,1) forwards; }
     @keyframes iLogoIn  { 0%{opacity:0;transform:skewX(-6deg) scale(.3) rotate(-8deg)} 60%{opacity:1;transform:skewX(-6deg) scale(1.1)} 100%{opacity:1;transform:skewX(-6deg) scale(1)} }
     @keyframes iLogoOut { 0%{opacity:1;transform:skewX(-6deg) scale(1)} 100%{opacity:0;transform:skewX(-6deg) scale(.7) translateY(-40px)} }
@@ -1190,9 +1190,9 @@ function playIntro(champ) {
     tag.classList.remove('show');
     ce.innerHTML=`<div class="intro-champ-eyebrow">★ CHAMPION DE LA SEMAINE</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS · ${champ.wins} VICTOIRES</div>`;
     ce.classList.add('show');
-  }, 1500));
-  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); fadeOutAudio(500); }, 3400));
-  introTimers.push(setTimeout(()=>{ ov.classList.add('hidden'); }, 3900));
+  }, 2100));
+  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); fadeOutAudio(500); }, 4000));
+  introTimers.push(setTimeout(()=>{ ov.classList.add('hidden'); }, 4500));
 
   document.getElementById('intro-skip').onclick=()=>{
     introTimers.forEach(clearTimeout);
