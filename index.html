@@ -606,6 +606,9 @@
 </head>
 <body>
 
+<!-- INTRO AUDIO -->
+<audio id="intro-audio" src="videoplayback.mp4" preload="auto"></audio>
+
 <!-- INTRO -->
 <div id="intro-overlay" class="hidden">
   <div class="intro-grid"></div>
@@ -1153,9 +1156,16 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function dateToInt(s){const[d,m,y]=s.split('/');return parseInt(y+m+d,10);}
 
 /* ── INTRO ─────────────────────────────────────────────────────────────── */
-const INTRO_KEY='ucb_intro_v1';
-function shouldPlayIntro(){return Date.now()-parseInt(localStorage.getItem(INTRO_KEY)||'0',10)>86400000;}
-function markIntroSeen(){localStorage.setItem(INTRO_KEY,String(Date.now()));}
+const introAudio = document.getElementById('intro-audio');
+
+function fadeOutAudio(duration) {
+  if (!introAudio || introAudio.paused) return;
+  const step = introAudio.volume / (duration / 50);
+  const fade = setInterval(() => {
+    introAudio.volume = Math.max(0, introAudio.volume - step);
+    if (introAudio.volume <= 0) { clearInterval(fade); introAudio.pause(); introAudio.currentTime = 0; introAudio.volume = 1; }
+  }, 50);
+}
 
 let introTimers=[];
 function playIntro(champ) {
@@ -1170,6 +1180,10 @@ function playIntro(champ) {
   ov.className='';
   void ov.offsetWidth;
 
+  // Lancer la musique (peut être bloqué sans geste utilisateur au 1er chargement)
+  introAudio.currentTime = 0; introAudio.volume = 1;
+  introAudio.play().catch(() => {});
+
   introTimers.push(setTimeout(()=>{ logo.classList.add('p1'); tag.classList.add('show'); }, 700));
   introTimers.push(setTimeout(()=>{
     logo.classList.remove('p1'); logo.classList.add('p2');
@@ -1177,11 +1191,13 @@ function playIntro(champ) {
     ce.innerHTML=`<div class="intro-champ-eyebrow">★ CHAMPION DE LA SEMAINE</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS · ${champ.wins} VICTOIRES</div>`;
     ce.classList.add('show');
   }, 1500));
-  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); }, 3400));
-  introTimers.push(setTimeout(()=>{ ov.classList.add('hidden'); markIntroSeen(); }, 3900));
+  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); fadeOutAudio(500); }, 3400));
+  introTimers.push(setTimeout(()=>{ ov.classList.add('hidden'); }, 3900));
 
   document.getElementById('intro-skip').onclick=()=>{
-    introTimers.forEach(clearTimeout); ov.classList.add('hidden'); markIntroSeen();
+    introTimers.forEach(clearTimeout);
+    ov.classList.add('hidden');
+    fadeOutAudio(400);
   };
 }
 
@@ -1195,7 +1211,7 @@ document.getElementById('replay-btn').addEventListener('click', ()=>{
   nameMap = map;
   if (stored.length) {
     await buildRanking(stored);
-    if (shouldPlayIntro() && allStats.length) playIntro(allStats[0]);
+    if (allStats.length) playIntro(allStats[0]);
   } else {
     document.getElementById('empty-state').style.display='flex';
   }
