@@ -274,9 +274,9 @@
     .ucb-replay-btn:hover { background: rgba(245,220,0,.1); }
     .ucb-settings-btn {
       background: transparent; border: 1px solid var(--border-dim);
-      color: var(--text-dim); padding: 8px 12px; font-family: inherit;
-      font-size: 11px; letter-spacing: .3em; font-weight: 700;
-      text-transform: uppercase; cursor: pointer;
+      color: var(--text-dim); width: 36px; height: 36px;
+      font-size: 18px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
     }
     .ucb-settings-btn:hover { color: var(--text); border-color: var(--text-mid); }
     .ucb-live {
@@ -684,7 +684,7 @@
       </div>
     </div>
     <div class="ucb-header-actions">
-<button class="ucb-settings-btn" id="settings-btn">⚙ RÉGLAGES</button>
+<button class="ucb-settings-btn" id="settings-btn" title="Réglages">⚙</button>
     </div>
   </header>
 
