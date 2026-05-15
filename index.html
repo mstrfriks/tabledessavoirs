@@ -491,6 +491,54 @@
     .ucb-day-card.winner .ucb-day-card-score { color: var(--accent); text-shadow: 0 0 12px rgba(245,220,0,.5); }
     .ucb-day-absent { font-size: 14px; color: var(--text-dim); text-align: right; letter-spacing: .3em; font-weight: 700; }
 
+    /* ── SEASONS VIEW ──────────────────────────────────────────────── */
+    .ucb-seasons { padding: 28px 40px 36px; }
+    .ucb-season-strip {
+      display: flex; gap: 4px; padding: 0 0 24px; overflow-x: auto; flex-wrap: wrap;
+    }
+    .ucb-season-chip {
+      background: transparent; border: 1px solid var(--border-dim);
+      color: var(--text-dim); padding: 10px 18px;
+      font-family: inherit; font-size: 13px; letter-spacing: .25em;
+      font-weight: 800; text-transform: uppercase; cursor: pointer;
+      text-align: center; line-height: 1; flex-shrink: 0;
+    }
+    .ucb-season-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .ucb-season-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 900; }
+    .ucb-season-hero {
+      display: flex; align-items: flex-start; gap: 32px;
+      padding: 24px 24px 28px;
+      background: linear-gradient(135deg, rgba(245,220,0,.08), rgba(20,32,70,.4));
+      border: 1px solid rgba(245,220,0,.3); margin-bottom: 20px;
+      position: relative; overflow: hidden;
+    }
+    .ucb-season-hero::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--danger), var(--accent), transparent);
+      background-size: 400px 100%; animation: heroShine 3s linear infinite;
+    }
+    .ucb-season-hero-left { flex: 1; min-width: 0; }
+    .ucb-season-eyebrow {
+      font-size: 11px; letter-spacing: .4em; font-weight: 800;
+      color: var(--accent); text-transform: uppercase; margin-bottom: 8px;
+    }
+    .ucb-season-champ {
+      font-weight: 900; font-size: 72px; line-height: .85;
+      letter-spacing: -.01em; text-transform: uppercase;
+      font-style: italic; transform: skewX(-6deg); transform-origin: left;
+      text-shadow: 0 0 30px rgba(245,220,0,.2), 3px 3px 0 rgba(245,220,0,.2);
+      overflow: hidden; max-width: 100%;
+    }
+    .ucb-season-tag { font-size: 14px; letter-spacing: .2em; color: var(--text-mid); margin-top: 8px; text-transform: uppercase; }
+    .ucb-season-stats { display: flex; gap: 24px; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(245,220,0,.2); flex-wrap: wrap; }
+    @media (max-width: 640px) {
+      .ucb-seasons { padding: 16px; }
+      .ucb-season-hero { flex-direction: column; gap: 16px; padding: 16px; }
+      .ucb-season-champ { font-size: 48px; }
+      .ucb-season-stats { gap: 16px; }
+      .ucb-stat-value { font-size: 28px; }
+    }
+
     /* ── TICKER ────────────────────────────────────────────────────── */
     .ucb-ticker {
       border-top: 1px solid rgba(245,220,0,.25);
@@ -642,6 +690,7 @@
   <nav class="ucb-tabs">
     <button class="ucb-tab active" data-view="leaderboard"><span>// Classement général</span></button>
     <button class="ucb-tab"        data-view="history"><span>// Journée par journée</span></button>
+    <button class="ucb-tab"        data-view="seasons"><span>// Saisons</span></button>
   </nav>
 
   <div id="leaderboard-view" class="view active">
@@ -672,6 +721,13 @@
     </div>
   </div>
 
+  <div id="seasons-view" class="view">
+    <div class="ucb-seasons">
+      <div class="ucb-season-strip" id="season-strip"></div>
+      <div id="season-content"></div>
+    </div>
+  </div>
+
   <div class="ucb-ticker">
     <div class="ucb-ticker-track" id="ticker-track"></div>
   </div>
@@ -692,7 +748,8 @@ let nameMap    = {};
 let allDays    = [];
 let allStats   = [];
 let curDayIdx  = 0;
-let curView    = 'leaderboard';
+let curView      = 'leaderboard';
+let curSeasonKey = null; // 'MM/YYYY'
 
 function dn(p) { return nameMap[p] || p; }
 
@@ -855,6 +912,94 @@ function renderTicker() {
   document.getElementById('ticker-track').innerHTML = html;
 }
 
+/* ── SEASONS ───────────────────────────────────────────────────────────── */
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function getAvailableSeasons() {
+  const set = new Set();
+  allDays.forEach(d => { const [,m,y] = d.split('/'); set.add(m+'/'+y); });
+  return [...set].sort((a, b) => {
+    const [am,ay]=a.split('/'), [bm,by]=b.split('/');
+    return (parseInt(ay)*12+parseInt(am)) - (parseInt(by)*12+parseInt(bm));
+  });
+}
+
+function computeSeasonStats(mk) {
+  const [m, y] = mk.split('/');
+  const days = allDays.filter(d => { const [,dm,dy]=d.split('/'); return dm===m && dy===y; });
+  const players = [...new Set(days.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
+  return players.map(name => {
+    const series = days.map(d => { const e=(byDate[d]||[]).find(e=>e.player===name); return e?e.score:null; });
+    const played = series.filter(s=>s!=null);
+    const total  = played.reduce((a,b)=>a+b,0);
+    const avg    = played.length ? total/played.length : 0;
+    const best   = played.length ? Math.max(...played) : 0;
+    const wins   = days.filter(d=>(dayWinners[d]||[]).includes(name)).length;
+    return { name, series, total, avg, best, played:played.length, wins, days:days.length };
+  }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'))
+    .map((s,i)=>({...s, rank:i+1}));
+}
+
+function renderSeasons() {
+  const seasons = getAvailableSeasons();
+  if (!seasons.length) return;
+  if (!curSeasonKey || !seasons.includes(curSeasonKey)) curSeasonKey = seasons[seasons.length-1];
+
+  // Strip
+  document.getElementById('season-strip').innerHTML = seasons.map(mk => {
+    const [m,y] = mk.split('/');
+    const label = MONTHS_FR[parseInt(m)-1].toUpperCase()+' '+y;
+    return `<button class="ucb-season-chip${mk===curSeasonKey?' active':''}" data-mk="${mk}">${label}</button>`;
+  }).join('');
+  document.querySelectorAll('.ucb-season-chip').forEach(btn =>
+    btn.addEventListener('click', () => { curSeasonKey=btn.dataset.mk; renderSeasons(); }));
+
+  const stats = computeSeasonStats(curSeasonKey);
+  const [m,y] = curSeasonKey.split('/');
+  const label = MONTHS_FR[parseInt(m)-1]+' '+y;
+  const champ = stats[0];
+  if (!champ) { document.getElementById('season-content').innerHTML='<p style="color:var(--text-dim);padding:20px">Aucune donnée pour cette saison.</p>'; return; }
+
+  const SUBS = ['★ Champion','◆ Challenger','◇ Outsider'];
+  document.getElementById('season-content').innerHTML = `
+    <div class="ucb-season-hero">
+      <div class="ucb-season-hero-left">
+        <div class="ucb-season-eyebrow">★ CHAMPION DE LA SAISON · ${label.toUpperCase()} · ${champ.days} JOURNÉES</div>
+        <div class="ucb-season-champ">${esc(dn(champ.name))}</div>
+        <div class="ucb-season-tag">${champ.wins} victoires de journée</div>
+        <div class="ucb-season-stats">
+          <div><div class="ucb-stat-label">Total</div><div class="ucb-stat-value acc">${champ.total}</div></div>
+          <div><div class="ucb-stat-label">Moyenne</div><div class="ucb-stat-value">${champ.avg.toFixed(2)}</div></div>
+          <div><div class="ucb-stat-label">Meilleur</div><div class="ucb-stat-value">${champ.best}<sub>/10</sub></div></div>
+          <div><div class="ucb-stat-label">Parties</div><div class="ucb-stat-value">${champ.played}<sub>/${champ.days}</sub></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="ucb-section-head"><span>// Classement · ${esc(label)}</span><span class="ucb-section-badge">${stats.length} JOUEURS</span></div>
+    <div class="ucb-rows">
+      <div class="ucb-row-head">
+        <div style="text-align:center">RANG</div><div>JOUEUR</div>
+        <div style="text-align:right">PARTIES</div><div style="text-align:right">MOY.</div>
+        <div style="text-align:right">WINS</div><div>FORME</div>
+        <div style="text-align:center">TOTAL</div>
+      </div>
+      ${stats.map((p,i) => {
+        const sub = p.rank<=3 ? SUBS[p.rank-1] : p.rank===stats.length ? '· En reconquête' : '· En lice';
+        return `<div class="ucb-row ${p.rank===1?'r1':''}">
+          <div class="ucb-row-rank ${p.rank>3?'dim':''}">${String(p.rank).padStart(2,'0')}</div>
+          <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
+          <div class="ucb-stat" style="text-align:right">${p.played}</div>
+          <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
+          <div class="ucb-stat" style="text-align:right">${p.wins}</div>
+          <div class="ucb-spark">${p.series.map(s=>s==null
+            ?`<div class="ucb-spark-bar miss"></div>`
+            :`<div class="ucb-spark-bar" style="height:${(s/10*100).toFixed(0)}%"></div>`).join('')}</div>
+          <div class="ucb-total">${p.total}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 /* ── TABS ──────────────────────────────────────────────────────────────── */
 document.querySelectorAll('.ucb-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -862,6 +1007,7 @@ document.querySelectorAll('.ucb-tab').forEach(btn => {
     document.querySelectorAll('.ucb-tab').forEach(b => b.classList.toggle('active', b.dataset.view === curView));
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === curView + '-view'));
     if (curView === 'history') renderHistory();
+    if (curView === 'seasons') renderSeasons();
   });
 });
 
