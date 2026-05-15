@@ -390,15 +390,41 @@ document.getElementById('clear-btn').addEventListener('click', clearData);
 
 /* ── PERSISTENCE ─────────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'tds_v1';
-function saveEntries(entries) {
+const API_BASE    = '/api/data';
+
+// Always mirror to localStorage as offline cache
+function lsSet(entries) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch(e) {}
 }
-function loadEntries() {
+function lsGet() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
 }
 
-function clearData() {
+async function saveEntries(entries) {
+  lsSet(entries);
+  try {
+    await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entries)
+    });
+  } catch(e) { /* server unavailable, localStorage cache is enough */ }
+}
+
+async function loadEntries() {
+  try {
+    const r = await fetch(API_BASE);
+    if (r.ok) {
+      const data = await r.json();
+      if (Array.isArray(data)) { lsSet(data); return data; }
+    }
+  } catch(e) { /* server unavailable */ }
+  return lsGet();
+}
+
+async function clearData() {
   if (!confirm('Effacer toutes les données sauvegardées ?')) return;
+  await saveEntries([]);
   localStorage.removeItem(STORAGE_KEY);
   rankingData = []; byDate = {}; dayWinners = {}; allPlayers = [];
   document.getElementById('import-section').style.display = '';
@@ -410,23 +436,20 @@ function clearData() {
 
 function processFile(file) {
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     const newEntries = parseWhatsApp(e.target.result);
     if (!newEntries.length) {
       showError('Aucune partie trouvée. Vérifiez que le fichier est bien un export WhatsApp contenant des scores "La Table des Savoirs".');
       return;
     }
-    // Merge with stored entries, then rebuild
-    const stored = loadEntries();
-    buildRanking([...stored, ...newEntries]);
+    const stored = await loadEntries();
+    await buildRanking([...stored, ...newEntries]);
     hideMsg();
     const total = parseInt(document.getElementById('stat-games').textContent, 10);
-    const prev  = stored.length;
-    const added = total - prev;
-    const msg = added > 0
+    const added = total - stored.length;
+    showInfo(added > 0
       ? `✓ ${added} nouvelle(s) partie(s) ajoutée(s) · ${total} au total`
-      : `✓ Fichier traité — aucune nouvelle partie (${total} au total)`;
-    showInfo(msg);
+      : `✓ Fichier traité — aucune nouvelle partie (${total} au total)`);
   };
   reader.onerror = () => showError('Impossible de lire le fichier.');
   reader.readAsText(file, 'UTF-8');
@@ -495,7 +518,7 @@ function normalizePlayer(name) {
 }
 
 /* ── RANKING COMPUTATION ─────────────────────────────────────────────────── */
-function buildRanking(entries) {
+async function buildRanking(entries) {
   // Best score per (date, player)
   const bestMap = {};
   for (const e of entries) {
@@ -504,7 +527,7 @@ function buildRanking(entries) {
   }
 
   // Persist deduplicated entries
-  saveEntries(Object.values(bestMap));
+  await saveEntries(Object.values(bestMap));
 
   byDate     = {};
   dayWinners = {};
@@ -690,10 +713,10 @@ function hideMsg() {
 }
 
 /* ── RESTORE ON LOAD ─────────────────────────────────────────────────────── */
-(function init() {
-  const stored = loadEntries();
+(async function init() {
+  const stored = await loadEntries();
   if (stored.length) {
-    buildRanking(stored);
+    await buildRanking(stored);
     showInfo('✓ Données restaurées — ' + stored.length + ' partie(s)');
   }
 })();
