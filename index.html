@@ -8,11 +8,11 @@
   <meta name="description" content="Championnat · Classement en direct">
   <meta property="og:title" content="Ultimate Culture Battle">
   <meta property="og:description" content="Championnat · Classement en direct">
-  <meta property="og:image" content="https://tabledessavoirs.cloudflare-struck529.workers.dev/og-image.svg">
+  <meta property="og:image" content="https://tabledessavoirs.cloudflare-struck529.workers.dev/og-image.png">
   <meta property="og:url" content="https://tabledessavoirs.cloudflare-struck529.workers.dev/">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://tabledessavoirs.cloudflare-struck529.workers.dev/og-image.svg">
+  <meta name="twitter:image" content="https://tabledessavoirs.cloudflare-struck529.workers.dev/og-image.png">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -421,6 +421,7 @@
     .ucb-row-name { font-size: 24px; font-weight: 900; text-transform: uppercase; font-style: italic; transform: skewX(-6deg); transform-origin: left; }
     .ucb-row-sub { font-size: 10px; letter-spacing: .25em; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
     .ucb-stat { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; font-size: 17px; }
+    .ucb-wins-sub { display: none; }
     .ucb-total { font-size: 32px; font-weight: 900; color: var(--accent); font-style: italic; transform: skewX(-6deg); text-align: center; font-variant-numeric: tabular-nums; }
     .ucb-row.r1 .ucb-total { text-shadow: 0 0 14px rgba(245,220,0,.5); }
     .ucb-spark { display: flex; align-items: flex-end; gap: 2px; height: 36px; }
@@ -498,7 +499,6 @@
     .ucb-day-card-score { font-size: 44px; font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; font-style: italic; transform: skewX(-6deg); }
     .ucb-day-card-score sub { font-size: 18px; color: var(--text-dim); }
     .ucb-day-card.winner .ucb-day-card-score { color: var(--accent); text-shadow: 0 0 12px rgba(245,220,0,.5); }
-    .ucb-day-absent { font-size: 14px; color: var(--text-dim); text-align: right; letter-spacing: .3em; font-weight: 700; }
 
     /* ── SEASONS VIEW ──────────────────────────────────────────────── */
     .ucb-seasons { padding: 28px 40px 36px; }
@@ -594,6 +594,7 @@
       .ucb-row-name { font-size: 18px; }
       .ucb-total { font-size: 22px; }
       .ucb-stat { font-size: 22px; }
+      .ucb-wins-sub { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; letter-spacing: .05em; margin-top: 2px; }
       .ucb-hist { padding: 16px; }
       .ucb-day-hero { grid-template-columns: auto 1fr auto; gap: 12px; padding: 14px; }
       .ucb-day-winner { display: none; }
@@ -827,7 +828,7 @@ function renderLeaderboard(animate) {
       <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
-      <div class="ucb-stat" style="text-align:right">${p.wins}</div>
+      <div class="ucb-stat" style="text-align:right">${p.wins}<div class="ucb-wins-sub">${p.total} pts</div></div>
       <div class="ucb-spark">${p.series.map(s => s==null
         ? `<div class="ucb-spark-bar miss"></div>`
         : `<div class="ucb-spark-bar" style="height:${(s/10*100).toFixed(0)}%"></div>`).join('')}</div>
@@ -890,7 +891,7 @@ function renderHistory() {
       <div class="ucb-day-card-rank">${dnp?'—':String(i+1).padStart(2,'0')}</div>
       <div class="ucb-day-card-name">${esc(dn(p.name))}</div>
       ${dnp
-        ? `<div class="ucb-day-absent">ABSENT</div>`
+        ? `<div class="ucb-day-card-score" style="color:var(--text-dim)">—<sub>/10</sub></div>`
         : `<div class="ucb-day-card-score">${p.score}<sub>/10</sub></div>`}
     </div>`;
   }).join('');
@@ -1001,7 +1002,7 @@ function renderSeasons() {
           <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
           <div class="ucb-stat" style="text-align:right">${p.played}</div>
           <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
-          <div class="ucb-stat" style="text-align:right">${p.wins}</div>
+          <div class="ucb-stat" style="text-align:right">${p.wins}<div class="ucb-wins-sub">${p.total} pts</div></div>
           <div class="ucb-spark">${p.series.map(s=>s==null
             ?`<div class="ucb-spark-bar miss"></div>`
             :`<div class="ucb-spark-bar" style="height:${(s/10*100).toFixed(0)}%"></div>`).join('')}</div>
