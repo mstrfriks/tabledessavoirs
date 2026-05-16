@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c1120"/>
+      <stop offset="1" stop-color="#05080f"/>
+    </linearGradient>
+    <linearGradient id="ucbG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff5b0"/>
+      <stop offset="1" stop-color="#f5dc00"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowText">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgG)"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="315" x2="1200" y2="315" stroke="#f5dc00" stroke-width=".5" stroke-opacity=".08"/>
+  <line x1="600" y1="0" x2="600" y2="630" stroke="#f5dc00" stroke-width=".5" stroke-opacity=".08"/>
+
+  <!-- Glow behind hexagon -->
+  <ellipse cx="600" cy="270" rx="220" ry="200" fill="#f5dc00" fill-opacity=".07" filter="url(#glow)"/>
+
+  <!-- UCB Hexagon (scaled up ~4.5x from original 56px viewBox) -->
+  <g transform="translate(600,265) scale(4.5) translate(-28,-28)">
+    <polygon points="28,2 52,16 52,40 28,54 4,40 4,16" fill="url(#ucbG)" stroke="#c9b400" stroke-width="1"/>
+    <polygon points="28,8 47,19 47,37 28,48 9,37 9,19" fill="none" stroke="rgba(5,8,15,.25)" stroke-width="1"/>
+    <text x="28" y="36" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="900" font-size="21" font-style="italic" fill="#05080f" letter-spacing="-1">UCB</text>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="490" text-anchor="middle"
+    font-family="Barlow Condensed,Arial Narrow,sans-serif"
+    font-weight="900" font-style="italic"
+    font-size="80" fill="#f4f1e8" letter-spacing="-1"
+    filter="url(#glowText)">ULTIMATE CULTURE BATTLE</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="548" text-anchor="middle"
+    font-family="Barlow Condensed,Arial Narrow,sans-serif"
+    font-weight="700" font-size="22"
+    fill="#f5dc00" letter-spacing="6">CHAMPIONNAT · CLASSEMENT EN DIRECT</text>
+
+  <!-- Bottom border accent -->
+  <rect x="0" y="618" width="1200" height="12" fill="#f5dc00" opacity=".9"/>
+</svg>
