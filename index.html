@@ -771,6 +771,14 @@ function computeStats() {
   curDayIdx = Math.max(0, allDays.length - 1);
 
   const players = [...new Set(Object.values(byDate).flat().map(e => e.player))];
+
+  // Compute season winners (one champion per season = highest total for that month)
+  const seasonWinnerMap = {}; // name -> count
+  getAvailableSeasons().forEach(mk => {
+    const s = computeSeasonStats(mk);
+    if (s.length) { const w = s[0]; seasonWinnerMap[w.name] = (seasonWinnerMap[w.name] || 0) + 1; }
+  });
+
   allStats = players.map(name => {
     const series  = allDays.map(d => { const e = (byDate[d] || []).find(e => e.player === name); return e ? e.score : null; });
     const played  = series.filter(s => s != null);
@@ -778,9 +786,10 @@ function computeStats() {
     const avg     = played.length ? total / played.length : 0;
     const best    = played.length ? Math.max(...played) : 0;
     const wins    = allDays.filter(d => (dayWinners[d] || []).includes(name)).length;
-    return { name, series, total, avg, best, played: played.length, wins };
+    const seasonWins = seasonWinnerMap[name] || 0;
+    return { name, series, total, avg, best, played: played.length, wins, seasonWins };
   });
-  allStats.sort((a, b) => b.wins - a.wins || b.total - a.total || a.name.localeCompare(b.name, 'fr'));
+  allStats.sort((a, b) => b.total - a.total || b.wins - a.wins || a.name.localeCompare(b.name, 'fr'));
   allStats.forEach((s, i) => s.rank = i + 1);
 }
 
@@ -790,8 +799,10 @@ function renderLeaderboard(animate) {
   const champ = allStats[0];
   const rival = allStats[1];
 
+  const curSk = getAvailableSeasons();
+  const curSlabel = curSk.length ? seasonLabel(curSk[curSk.length-1]).toUpperCase() : 'SAISON 01';
   document.getElementById('header-subtitle').textContent =
-    `SAISON 01 · JOURNÉE ${allDays.length}/${allDays.length} · QUIZ FAMILIAL`;
+    `${curSlabel} · JOURNÉE ${allDays.length}/${allDays.length} · QUIZ FAMILIAL`;
 
   const champPct = rival ? champ.total / (champ.total + rival.total) * 100 : 100;
   const gap = rival ? champ.total - rival.total : 0;
@@ -825,7 +836,7 @@ function renderLeaderboard(animate) {
     const sub = p.rank <= 3 ? SUBS[p.rank - 1] : p.rank === allStats.length ? '· En reconquête' : '· En lice';
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
       <div class="ucb-row-rank ${p.rank>3?'dim':''}">${String(p.rank).padStart(2,'0')}</div>
-      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
+      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.seasonWins>0?` <span style="font-style:normal;font-size:.7em">🏆${p.seasonWins>1?'×'+p.seasonWins:''}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
       <div class="ucb-stat" style="text-align:right">${p.wins}<div class="ucb-wins-sub">${p.total} pts</div></div>
@@ -935,6 +946,9 @@ function getAvailableSeasons() {
     return (parseInt(ay)*12+parseInt(am)) - (parseInt(by)*12+parseInt(bm));
   });
 }
+function seasonLabel(mk) {
+  return 'Saison ' + String(getAvailableSeasons().indexOf(mk) + 1).padStart(2, '0');
+}
 
 function computeSeasonStats(mk) {
   const [m, y] = mk.split('/');
@@ -948,7 +962,7 @@ function computeSeasonStats(mk) {
     const best   = played.length ? Math.max(...played) : 0;
     const wins   = days.filter(d=>(dayWinners[d]||[]).includes(name)).length;
     return { name, series, total, avg, best, played:played.length, wins, days:days.length };
-  }).sort((a,b)=>b.wins-a.wins||b.total-a.total||a.name.localeCompare(b.name,'fr'))
+  }).sort((a,b)=>b.total-a.total||b.wins-a.wins||a.name.localeCompare(b.name,'fr'))
     .map((s,i)=>({...s, rank:i+1}));
 }
 
@@ -959,16 +973,13 @@ function renderSeasons() {
 
   // Strip
   document.getElementById('season-strip').innerHTML = seasons.map(mk => {
-    const [m,y] = mk.split('/');
-    const label = MONTHS_FR[parseInt(m)-1].toUpperCase()+' '+y;
-    return `<button class="ucb-season-chip${mk===curSeasonKey?' active':''}" data-mk="${mk}">${label}</button>`;
+    return `<button class="ucb-season-chip${mk===curSeasonKey?' active':''}" data-mk="${mk}">${seasonLabel(mk).toUpperCase()}</button>`;
   }).join('');
   document.querySelectorAll('.ucb-season-chip').forEach(btn =>
     btn.addEventListener('click', () => { curSeasonKey=btn.dataset.mk; renderSeasons(); }));
 
   const stats = computeSeasonStats(curSeasonKey);
-  const [m,y] = curSeasonKey.split('/');
-  const label = MONTHS_FR[parseInt(m)-1]+' '+y;
+  const label = seasonLabel(curSeasonKey);
   const champ = stats[0];
   if (!champ) { document.getElementById('season-content').innerHTML='<p style="color:var(--text-dim);padding:20px">Aucune donnée pour cette saison.</p>'; return; }
 
@@ -976,7 +987,7 @@ function renderSeasons() {
   document.getElementById('season-content').innerHTML = `
     <div class="ucb-season-hero">
       <div class="ucb-season-hero-left">
-        <div class="ucb-season-eyebrow">★ CHAMPION DE LA SAISON · ${label.toUpperCase()} · ${champ.days} JOURNÉES</div>
+        <div class="ucb-season-eyebrow">★ CHAMPION DE LA SAISON · ${esc(label.toUpperCase())} · ${champ.days} JOURNÉES</div>
         <div class="ucb-season-champ">${esc(dn(champ.name))}</div>
         <div class="ucb-season-tag">${champ.wins} victoires de journée</div>
         <div class="ucb-season-stats">
@@ -1185,6 +1196,7 @@ function playIntro(champ) {
   const ce   = document.getElementById('intro-champ');
   logo.className='intro-logo'; logo.textContent='UCB';
   tag.className='intro-tagline';
+  const sk = getAvailableSeasons(); tag.textContent = 'Ultimate Culture Battle · ' + (sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01');
   ce.className='intro-champ'; ce.innerHTML='';
   ov.className='';
   void ov.offsetWidth;
