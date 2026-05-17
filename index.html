@@ -421,7 +421,6 @@
     .ucb-row-name { font-size: 24px; font-weight: 900; text-transform: uppercase; font-style: italic; transform: skewX(-6deg); transform-origin: left; }
     .ucb-row-sub { font-size: 10px; letter-spacing: .25em; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
     .ucb-stat { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; font-size: 17px; }
-    .ucb-wins-sub { display: none; }
     .ucb-total { font-size: 32px; font-weight: 900; color: var(--accent); font-style: italic; transform: skewX(-6deg); text-align: center; font-variant-numeric: tabular-nums; }
     .ucb-row.r1 .ucb-total { text-shadow: 0 0 14px rgba(245,220,0,.5); }
     .ucb-spark { display: flex; align-items: flex-end; gap: 2px; height: 36px; }
@@ -1196,7 +1195,7 @@ function playIntro(champ) {
   introTimers.push(setTimeout(()=>{
     logo.classList.remove('p1'); logo.classList.add('p2');
     tag.classList.remove('show');
-    ce.innerHTML=`<div class="intro-champ-eyebrow">★ CHAMPION DE LA SEMAINE</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS · ${champ.wins} VICTOIRES</div>`;
+    ce.innerHTML=`<div class="intro-champ-eyebrow">★ CHAMPION EN TITRE</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS</div>`;
     ce.classList.add('show');
   }, 2100));
   introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); fadeOutAudio(500); }, 4000));
