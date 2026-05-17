@@ -388,14 +388,14 @@
     .ucb-rows { padding: 0 40px 24px; }
     .ucb-row-head {
       display: grid;
-      grid-template-columns: 60px 1fr 70px 70px 70px 180px 100px;
+      grid-template-columns: 60px 1fr 70px 70px 180px 100px;
       align-items: center; gap: 14px;
       padding: 8px 18px; margin-bottom: 6px;
       font-size: 10px; letter-spacing: .3em; color: var(--text-dim); font-weight: 800; text-transform: uppercase;
     }
     .ucb-row {
       display: grid;
-      grid-template-columns: 60px 1fr 70px 70px 70px 180px 100px;
+      grid-template-columns: 60px 1fr 70px 70px 180px 100px;
       align-items: center; gap: 14px;
       padding: 14px 18px;
       background: linear-gradient(90deg, rgba(20,32,70,.5), rgba(20,32,70,.2));
@@ -583,18 +583,15 @@
       .ucb-row-head { grid-template-columns: 44px 1fr 60px; gap: 8px; padding: 6px 12px; }
       .ucb-row-head > :nth-child(3),
       .ucb-row-head > :nth-child(4),
-      .ucb-row-head > :nth-child(6),
-      .ucb-row-head > :nth-child(7) { display: none; }
+      .ucb-row-head > :nth-child(5) { display: none; }
       .ucb-row { grid-template-columns: 44px 1fr 60px; gap: 8px; padding: 12px; }
       .ucb-row > :nth-child(3),
       .ucb-row > :nth-child(4),
-      .ucb-row > :nth-child(6),
-      .ucb-row > :nth-child(7) { display: none; }
+      .ucb-row > :nth-child(5) { display: none; }
       .ucb-row-rank { font-size: 24px; }
       .ucb-row-name { font-size: 18px; }
       .ucb-total { font-size: 22px; }
       .ucb-stat { font-size: 22px; }
-      .ucb-wins-sub { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; letter-spacing: .05em; margin-top: 2px; }
       .ucb-hist { padding: 16px; }
       .ucb-day-hero { grid-template-columns: auto 1fr auto; gap: 12px; padding: 14px; }
       .ucb-day-winner { display: none; }
@@ -717,7 +714,6 @@
         <div>JOUEUR</div>
         <div style="text-align:right">PARTIES</div>
         <div style="text-align:right">MOY.</div>
-        <div style="text-align:right">WINS</div>
         <div>FORME</div>
         <div style="text-align:center">TOTAL</div>
       </div>
@@ -755,7 +751,6 @@ const SEASON_START = 20260515; // YYYYMMDD — ignorer les données antérieures
 
 /* ── STATE ─────────────────────────────────────────────────────────────── */
 let byDate     = {};
-let dayWinners = {};
 let nameMap    = {};
 let allDays    = [];
 let allStats   = [];
@@ -785,11 +780,10 @@ function computeStats() {
     const total   = played.reduce((a, b) => a + b, 0);
     const avg     = played.length ? total / played.length : 0;
     const best    = played.length ? Math.max(...played) : 0;
-    const wins    = allDays.filter(d => (dayWinners[d] || []).includes(name)).length;
     const seasonWins = seasonWinnerMap[name] || 0;
-    return { name, series, total, avg, best, played: played.length, wins, seasonWins };
+    return { name, series, total, avg, best, played: played.length, seasonWins };
   });
-  allStats.sort((a, b) => b.total - a.total || b.wins - a.wins || a.name.localeCompare(b.name, 'fr'));
+  allStats.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
   allStats.forEach((s, i) => s.rank = i + 1);
 }
 
@@ -810,7 +804,7 @@ function renderLeaderboard(animate) {
     `<div class="ucb-hero-left">
       <div class="ucb-hero-eyebrow">★ CHAMPION EN TITRE · J${allDays.length}</div>
       <div class="ucb-champ-name">${esc(dn(champ.name))}</div>
-      <div class="ucb-champ-tag">Tête du championnat · ${champ.wins} victoires de journée</div>
+      <div class="ucb-champ-tag">Tête du championnat</div>
       <div class="ucb-champ-stats">
         <div><div class="ucb-stat-label">Total</div><div class="ucb-stat-value acc">${champ.total}</div></div>
         <div><div class="ucb-stat-label">Moyenne</div><div class="ucb-stat-value">${champ.avg.toFixed(2)}</div></div>
@@ -839,7 +833,6 @@ function renderLeaderboard(animate) {
       <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.seasonWins>0?` <span style="font-style:normal;font-size:.7em">🏆${p.seasonWins>1?'×'+p.seasonWins:''}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
-      <div class="ucb-stat" style="text-align:right">${p.wins}<div class="ucb-wins-sub">${p.total} pts</div></div>
       <div class="ucb-spark">${p.series.map(s => s==null
         ? `<div class="ucb-spark-bar miss"></div>`
         : `<div class="ucb-spark-bar" style="height:${(s/10*100).toFixed(0)}%"></div>`).join('')}</div>
@@ -920,14 +913,12 @@ function flashAndRender() {
 function renderTicker() {
   if (!allStats.length || !allDays.length) return;
   const byAvg  = [...allStats].sort((a,b) => b.avg - a.avg);
-  const byWins = [...allStats].sort((a,b) => b.wins - a.wins);
   const last   = allDays[allDays.length-1];
   const rival  = allStats[1];
   const items  = [
     `★ ${dn(allStats[0].name).toUpperCase()} EN TÊTE AVEC ${allStats[0].total} POINTS`,
     rival ? `★ ÉCART CHAMPION/CHALLENGER · ${allStats[0].total - rival.total} PTS` : null,
     `★ MEILLEURE MOYENNE · ${dn(byAvg[0].name).toUpperCase()} (${byAvg[0].avg.toFixed(2)})`,
-    `★ PLUS DE VICTOIRES · ${dn(byWins[0].name).toUpperCase()} (${byWins[0].wins})`,
     `★ DERNIÈRE JOURNÉE · ${last}`,
     `★ ${allDays.length} JOURNÉES JOUÉES`,
   ].filter(Boolean);
@@ -960,9 +951,8 @@ function computeSeasonStats(mk) {
     const total  = played.reduce((a,b)=>a+b,0);
     const avg    = played.length ? total/played.length : 0;
     const best   = played.length ? Math.max(...played) : 0;
-    const wins   = days.filter(d=>(dayWinners[d]||[]).includes(name)).length;
-    return { name, series, total, avg, best, played:played.length, wins, days:days.length };
-  }).sort((a,b)=>b.total-a.total||b.wins-a.wins||a.name.localeCompare(b.name,'fr'))
+    return { name, series, total, avg, best, played:played.length, days:days.length };
+  }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'))
     .map((s,i)=>({...s, rank:i+1}));
 }
 
@@ -989,7 +979,7 @@ function renderSeasons() {
       <div class="ucb-season-hero-left">
         <div class="ucb-season-eyebrow">★ CHAMPION DE LA SAISON · ${esc(label.toUpperCase())} · ${champ.days} JOURNÉES</div>
         <div class="ucb-season-champ">${esc(dn(champ.name))}</div>
-        <div class="ucb-season-tag">${champ.wins} victoires de journée</div>
+        <div class="ucb-season-tag">Champion de la saison</div>
         <div class="ucb-season-stats">
           <div><div class="ucb-stat-label">Total</div><div class="ucb-stat-value acc">${champ.total}</div></div>
           <div><div class="ucb-stat-label">Moyenne</div><div class="ucb-stat-value">${champ.avg.toFixed(2)}</div></div>
@@ -1003,8 +993,7 @@ function renderSeasons() {
       <div class="ucb-row-head">
         <div style="text-align:center">RANG</div><div>JOUEUR</div>
         <div style="text-align:right">PARTIES</div><div style="text-align:right">MOY.</div>
-        <div style="text-align:right">WINS</div><div>FORME</div>
-        <div style="text-align:center">TOTAL</div>
+        <div>FORME</div><div style="text-align:center">TOTAL</div>
       </div>
       ${stats.map((p,i) => {
         const sub = p.rank<=3 ? SUBS[p.rank-1] : p.rank===stats.length ? '· En reconquête' : '· En lice';
@@ -1013,7 +1002,6 @@ function renderSeasons() {
           <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
           <div class="ucb-stat" style="text-align:right">${p.played}</div>
           <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
-          <div class="ucb-stat" style="text-align:right">${p.wins}<div class="ucb-wins-sub">${p.total} pts</div></div>
           <div class="ucb-spark">${p.series.map(s=>s==null
             ?`<div class="ucb-spark-bar miss"></div>`
             :`<div class="ucb-spark-bar" style="height:${(s/10*100).toFixed(0)}%"></div>`).join('')}</div>
@@ -1134,9 +1122,8 @@ async function buildRanking(entries) {
     const k=e.date+'||'+e.player;if(!best[k]||e.score>best[k].score)best[k]=e;
   }
   await saveEntries(Object.values(best));
-  byDate={}; dayWinners={};
+  byDate={};
   for(const e of Object.values(best)) (byDate[e.date]=byDate[e.date]||[]).push(e);
-  for(const [date,de] of Object.entries(byDate)){const max=Math.max(...de.map(e=>e.score));dayWinners[date]=de.filter(e=>e.score===max).map(e=>e.player);}
   computeStats();
   showApp();
   renderLeaderboard(true);
@@ -1161,7 +1148,7 @@ async function clearData() {
   if(!confirm('Effacer toutes les données sauvegardées ?'))return;
   await saveEntries([]);
   localStorage.removeItem(SK);
-  byDate={}; dayWinners={}; allDays=[]; allStats=[]; curDayIdx=0;
+  byDate={}; allDays=[]; allStats=[]; curDayIdx=0;
   document.getElementById('app').style.display='none';
   document.getElementById('empty-state').style.display='flex';
   closeSettings();
