@@ -990,18 +990,19 @@ function computeSeasonStats(mk) {
   const [m, y] = mk.split('/');
   const days = allDays.filter(d => { const [,dm,dy]=d.split('/'); return dm===m && dy===y; });
   const players = [...new Set(days.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
-  return players.map(name => {
+  const sorted = players.map(name => {
     const series = days.map(d => { const e=(byDate[d]||[]).find(e=>e.player===name); return e?e.score:null; });
     const played = series.filter(s=>s!=null);
     const total  = played.reduce((a,b)=>a+b,0);
     const avg    = played.length ? total/played.length : 0;
     const best   = played.length ? Math.max(...played) : 0;
     return { name, series, total, avg, best, played:played.length, days:days.length };
-  }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'))
-    .map((s,i,arr)=>({...s,
-      rank: i===0 ? 1 : (s.total===arr[i-1].total ? arr[i-1].rank : i+1),
-      tied: i>0 && s.total===arr[i-1].total || i<arr.length-1 && s.total===arr[i+1]?.total
-    }));
+  }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'));
+  sorted.forEach((s,i) => {
+    s.rank = i===0 ? 1 : (s.total===sorted[i-1].total ? sorted[i-1].rank : i+1);
+    s.tied = (i>0 && s.total===sorted[i-1].total) || (i<sorted.length-1 && s.total===sorted[i+1].total);
+  });
+  return sorted;
 }
 
 function renderSeasons() {
