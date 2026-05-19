@@ -805,20 +805,26 @@ function computeStats() {
 function renderLeaderboard(animate) {
   if (!allStats.length) return;
   const champ = allStats[0];
-  const rival = allStats[1];
+  const leaders = allStats.filter(s => s.rank === 1);
+  const isExAequo = leaders.length > 1;
+  const rival = allStats.find(s => s.rank > 1);
+  const tiedAtTop = !rival || allStats[1].rank === 1;
 
   const curSk = getAvailableSeasons();
   const curSlabel = curSk.length ? seasonLabel(curSk[curSk.length-1]).toUpperCase() : 'SAISON 01';
   document.getElementById('header-subtitle').textContent =
     `${curSlabel} · JOURNÉE ${allDays.length}/${allDays.length} · QUIZ FAMILIAL`;
 
+  const leadersNames = leaders.map(s => esc(dn(s.name))).join(' · ');
+  const eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length}` : `★ LEADER · J${allDays.length}`;
+  const tag = isExAequo ? 'Ex-æquo en tête du championnat' : 'Tête du championnat';
   const champPct = rival ? champ.total / (champ.total + rival.total) * 100 : 100;
   const gap = rival ? champ.total - rival.total : 0;
   document.getElementById('ucb-hero').innerHTML =
     `<div class="ucb-hero-left">
-      <div class="ucb-hero-eyebrow">★ LEADER · J${allDays.length}</div>
-      <div class="ucb-champ-name">${esc(dn(champ.name))}</div>
-      <div class="ucb-champ-tag">Tête du championnat</div>
+      <div class="ucb-hero-eyebrow">${eyebrow}</div>
+      <div class="ucb-champ-name">${leadersNames}</div>
+      <div class="ucb-champ-tag">${tag}</div>
       <div class="ucb-champ-stats">
         <div><div class="ucb-stat-label">Total</div><div class="ucb-stat-value acc">${champ.total}</div></div>
         <div><div class="ucb-stat-label">Moyenne</div><div class="ucb-stat-value">${champ.avg.toFixed(2)}</div></div>
@@ -826,7 +832,7 @@ function renderLeaderboard(animate) {
         <div><div class="ucb-stat-label">Parties</div><div class="ucb-stat-value">${champ.played}<sub>/${allDays.length}</sub></div></div>
       </div>
     </div>
-    ${rival ? `<div class="ucb-hero-right">
+    ${rival && !tiedAtTop ? `<div class="ucb-hero-right">
       <div class="ucb-vs-label">★ DUEL POUR LA COURONNE</div>
       <div class="ucb-vs-row">
         <div><div class="ucb-vs-name">${esc(dn(champ.name))}</div><div class="ucb-vs-pts">${champ.total} PTS</div></div>
@@ -992,7 +998,10 @@ function computeSeasonStats(mk) {
     const best   = played.length ? Math.max(...played) : 0;
     return { name, series, total, avg, best, played:played.length, days:days.length };
   }).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'))
-    .map((s,i)=>({...s, rank:i+1}));
+    .map((s,i,arr)=>({...s,
+      rank: i===0 ? 1 : (s.total===arr[i-1].total ? arr[i-1].rank : i+1),
+      tied: i>0 && s.total===arr[i-1].total || i<arr.length-1 && s.total===arr[i+1]?.total
+    }));
 }
 
 function renderSeasons() {
@@ -1012,13 +1021,23 @@ function renderSeasons() {
   const champ = stats[0];
   if (!champ) { document.getElementById('season-content').innerHTML='<p style="color:var(--text-dim);padding:20px">Aucune donnée pour cette saison.</p>'; return; }
 
+  const sLeaders = stats.filter(s => s.rank === 1);
+  const sIsExAequo = sLeaders.length > 1;
+  const sLeadersNames = sLeaders.map(s => esc(dn(s.name))).join(' · ');
+  const sEyebrow = sIsExAequo
+    ? `= EX-ÆQUO · ${esc(label.toUpperCase())} · ${champ.days} JOURNÉES`
+    : `★ CHAMPION DE LA SAISON · ${esc(label.toUpperCase())} · ${champ.days} JOURNÉES`;
+  const sTag = sIsExAequo ? 'Ex-æquo champions de la saison' : 'Champion de la saison';
+
   const SUBS = ['★ Champion','◆ Challenger','◇ Outsider'];
+  const MID_SUBS = ['· Prétendant','· En embuscade','· Tapi dans l\'ombre','· Dans la mêlée','· À l\'affût','· En campagne'];
+  const NEG_SUBS = ['· Lanterne rouge','· En perdition','· À la traîne'];
   document.getElementById('season-content').innerHTML = `
     <div class="ucb-season-hero">
       <div class="ucb-season-hero-left">
-        <div class="ucb-season-eyebrow">★ CHAMPION DE LA SAISON · ${esc(label.toUpperCase())} · ${champ.days} JOURNÉES</div>
-        <div class="ucb-season-champ">${esc(dn(champ.name))}</div>
-        <div class="ucb-season-tag">Champion de la saison</div>
+        <div class="ucb-season-eyebrow">${sEyebrow}</div>
+        <div class="ucb-season-champ">${sLeadersNames}</div>
+        <div class="ucb-season-tag">${sTag}</div>
         <div class="ucb-season-stats">
           <div><div class="ucb-stat-label">Total</div><div class="ucb-stat-value acc">${champ.total}</div></div>
           <div><div class="ucb-stat-label">Moyenne</div><div class="ucb-stat-value">${champ.avg.toFixed(2)}</div></div>
@@ -1035,9 +1054,12 @@ function renderSeasons() {
         <div>FORME</div><div style="text-align:center">TOTAL</div>
       </div>
       ${stats.map((p,i) => {
-        const sub = p.rank<=3 ? SUBS[p.rank-1] : p.rank===stats.length ? '· En reconquête' : '· En lice';
+        const fromLast = stats.length - 1 - i;
+        const sub = p.rank<=3 ? SUBS[p.rank-1]
+          : fromLast < 3 ? NEG_SUBS[fromLast]
+          : MID_SUBS[(p.rank - 4) % MID_SUBS.length];
         return `<div class="ucb-row ${p.rank===1?'r1':''}">
-          <div class="ucb-row-rank ${p.rank>3?'dim':''}">${String(p.rank).padStart(2,'0')}</div>
+          <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}</div>
           <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">${sub}</div></div>
           <div class="ucb-stat" style="text-align:right">${p.played}</div>
           <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
