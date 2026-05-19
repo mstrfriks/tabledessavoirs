@@ -101,29 +101,30 @@
     }
     .intro-tagline.show { animation: iFadeIn .5s .3s forwards; }
     @keyframes iFadeIn { to { opacity: 1; } }
-    .intro-champ { opacity: 0; font-style: italic; }
+    .intro-champ { opacity: 0; font-style: italic; display: flex; flex-direction: column; align-items: center; text-align: center; }
     .intro-champ.show { animation: iChampIn .7s cubic-bezier(.2,1.4,.4,1) .1s forwards; }
     @keyframes iChampIn {
       0%  { opacity:0; transform:translateY(40px) skewX(-6deg); filter:blur(20px); }
-      100%{ opacity:1; transform:translateY(0)    skewX(-6deg); filter:blur(0); }
+      100%{ opacity:1; transform:translateY(0); filter:blur(0); }
     }
     .intro-champ-eyebrow {
       display: inline-flex; align-items: center; gap: 12px;
       font-size: 13px; letter-spacing: .6em; font-weight: 800;
       color: var(--accent); padding: 8px 18px;
       border: 1px solid var(--accent); background: rgba(245,220,0,.05);
-      margin-bottom: 26px; font-style: normal; transform: skewX(6deg); text-transform: uppercase;
+      margin-bottom: 26px; font-style: normal; text-transform: uppercase;
     }
     .intro-champ-name {
       font-weight: 900; font-size: 180px; line-height: .85;
       letter-spacing: -.02em; text-transform: uppercase; color: var(--text);
       text-shadow: 0 0 60px rgba(245,220,0,.4), 6px 6px 0 rgba(245,220,0,.4);
-      max-width: 100%; overflow: hidden;
+      max-width: 100%; overflow: hidden; display: block;
+      transform: skewX(-6deg);
     }
     .intro-champ-pts {
       font-size: 28px; font-weight: 900; color: var(--accent);
       letter-spacing: .3em; margin-top: 20px; font-variant-numeric: tabular-nums;
-      font-style: normal; transform: skewX(6deg); display: block; text-align: center;
+      font-style: normal; display: block; text-align: center;
     }
     .intro-skip {
       position: absolute; bottom: 24px; right: 28px;
@@ -794,7 +795,10 @@ function computeStats() {
     return { name, series, total, avg, best, played: played.length, seasonWins };
   });
   allStats.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
-  allStats.forEach((s, i) => s.rank = i + 1);
+  allStats.forEach((s, i) => {
+    s.rank = i === 0 ? 1 : (s.total === allStats[i-1].total ? allStats[i-1].rank : i + 1);
+    s.tied = i > 0 && s.total === allStats[i-1].total || i < allStats.length-1 && s.total === allStats[i+1].total;
+  });
 }
 
 /* ── LEADERBOARD ───────────────────────────────────────────────────────── */
@@ -844,12 +848,19 @@ function renderLeaderboard(animate) {
       total: prevDays.reduce((sum, d) => { const e = (byDate[d]||[]).find(e=>e.player===p.name); return sum+(e?e.score:0); }, 0)
     }));
     prevTotals.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
-    prevTotals.forEach((s, i) => { prevRankOf[s.name] = i + 1; });
+    prevTotals.forEach((s, i) => {
+      prevRankOf[s.name] = i === 0 ? 1 : (s.total === prevTotals[i-1].total ? prevRankOf[prevTotals[i-1].name] : i + 1);
+    });
   }
 
   const SUBS = ['★ Leader','◆ Challenger','◇ Outsider'];
+  const MID_SUBS = ['· Prétendant','· En embuscade','· Tapi dans l\'ombre','· Dans la mêlée','· À l\'affût','· En campagne'];
+  const NEG_SUBS = ['· Lanterne rouge','· En perdition','· À la traîne'];
   document.getElementById('standings-rows').innerHTML = allStats.map((p, i) => {
-    const sub = p.rank <= 3 ? SUBS[p.rank - 1] : p.rank === allStats.length ? '· En reconquête' : '· En lice';
+    const fromLast = allStats.length - 1 - i;
+    const sub = p.rank <= 3 ? SUBS[p.rank - 1]
+      : fromLast < 3 ? NEG_SUBS[fromLast]
+      : MID_SUBS[(p.rank - 4) % MID_SUBS.length];
     const prev = prevRankOf[p.name];
     const delta = prev != null ? prev - p.rank : null;
     const deltaHtml = delta == null ? '<span class="ucb-rank-delta eq">—</span>'
@@ -857,7 +868,7 @@ function renderLeaderboard(animate) {
       : delta < 0 ? `<span class="ucb-rank-delta dn">▼${Math.abs(delta)}</span>`
       : '<span class="ucb-rank-delta eq">—</span>';
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
-      <div class="ucb-row-rank ${p.rank>3?'dim':''}">${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
+      <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
       <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.seasonWins>0?` <span style="font-style:normal;font-size:.7em">🏆${p.seasonWins>1?'×'+p.seasonWins:''}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
