@@ -1208,11 +1208,19 @@ async function loadNameMap()  { try{const r=await fetch('/api/namemap');if(r.ok)
 
 /* ── PARSER ────────────────────────────────────────────────────────────── */
 function parseMsgStart(line) {
-  const fA = line.match(/^\[(\d{2}\/\d{2}\/\d{4})[,\s]+\d{2}:\d{2}(?::\d{2})?\]\s+(.+?):\s*([\s\S]*)$/);
-  if (fA) return { date:fA[1], player:fA[2].trim(), content:fA[3] };
-  const fB = line.match(/^(\d{2}\/\d{2}\/\d{4}),\s+\d{2}:\d{2}\s+-\s+(.+?):\s*([\s\S]*)$/);
-  if (fB) return { date:fB[1], player:fB[2].trim(), content:fB[3] };
+  const fA = line.match(/^\[(\d{2}\/\d{2}\/\d{4})[,\s]+(\d{2}:\d{2})(?::\d{2})?\]\s+(.+?):\s*([\s\S]*)$/);
+  if (fA) return { date:fA[1], time:fA[2], player:fA[3].trim(), content:fA[4] };
+  const fB = line.match(/^(\d{2}\/\d{2}\/\d{4}),\s+(\d{2}:\d{2})\s+-\s+(.+?):\s*([\s\S]*)$/);
+  if (fB) return { date:fB[1], time:fB[2], player:fB[3].trim(), content:fB[4] };
   return null;
+}
+// Cycle 12h→12h : un message envoyé avant midi appartient au quiz de la veille
+function quizDate(date, time) {
+  if (!time || time >= '12:00') return date;
+  const [d, m, y] = date.split('/');
+  const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  dt.setDate(dt.getDate() - 1);
+  return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + '/' + dt.getFullYear();
 }
 const QUIZ_RE=/Quiz[^(]*\((\d+)\/10\)/i, TABLE_RE=/La Table des Savoirs/i;
 function parseWhatsApp(text) {
@@ -1223,7 +1231,7 @@ function parseWhatsApp(text) {
     const msg=parseMsgStart(lines[i]); if(!msg){i++;continue;}
     let j=i+1; while(j<lines.length&&!parseMsgStart(lines[j]))j++;
     const full=msg.content+(j>i+1?'\n'+lines.slice(i+1,j).join('\n'):'');
-    if(TABLE_RE.test(full)){const sm=full.match(QUIZ_RE);if(sm)entries.push({date:msg.date,player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});}
+    if(TABLE_RE.test(full)){const sm=full.match(QUIZ_RE);if(sm)entries.push({date:quizDate(msg.date,msg.time),player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});}
     i=j;
   }
   return entries;
