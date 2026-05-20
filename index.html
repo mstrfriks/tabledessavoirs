@@ -619,9 +619,6 @@
 </head>
 <body>
 
-<!-- INTRO AUDIO -->
-<audio id="intro-audio" src="videoplayback.mp4" preload="auto"></audio>
-
 <!-- INTRO -->
 <div id="intro-overlay" class="hidden">
   <div class="intro-grid"></div>
@@ -1214,7 +1211,7 @@ function parseMsgStart(line) {
   if (fB) return { date:fB[1], time:fB[2], player:fB[3].trim(), content:fB[4] };
   return null;
 }
-const MONTHS_FR={'janvier':'01','février':'02','mars':'03','avril':'04','mai':'05','juin':'06','juillet':'07','août':'08','septembre':'09','octobre':'10','novembre':'11','décembre':'12'};
+const MONTHS_FR_MAP={'janvier':'01','février':'02','mars':'03','avril':'04','mai':'05','juin':'06','juillet':'07','août':'08','septembre':'09','octobre':'10','novembre':'11','décembre':'12'};
 const TABLE_DATE_RE=/La Table des Savoirs\s*-\s*(\d{1,2})\s+(\w+)\s+(\d{4})/i;
 const QUIZ_RE=/Quiz[^(]*\((\d+)\/10\)/i, TABLE_RE=/La Table des Savoirs/i;
 function parseWhatsApp(text) {
@@ -1229,7 +1226,7 @@ function parseWhatsApp(text) {
       const sm=full.match(QUIZ_RE); if(!sm){i=j;continue;}
       const dm=full.match(TABLE_DATE_RE);
       let date=msg.date;
-      if(dm){const mo=MONTHS_FR[dm[2].toLowerCase()];if(mo)date=String(dm[1]).padStart(2,'0')+'/'+mo+'/'+dm[3];}
+      if(dm){const mo=MONTHS_FR_MAP[dm[2].toLowerCase()];if(mo)date=String(dm[1]).padStart(2,'0')+'/'+mo+'/'+dm[3];}
       entries.push({date,player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});
     }
     i=j;
@@ -1288,17 +1285,6 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function dateToInt(s){const[d,m,y]=s.split('/');return parseInt(y+m+d,10);}
 
 /* ── INTRO ─────────────────────────────────────────────────────────────── */
-const introAudio = document.getElementById('intro-audio');
-
-function fadeOutAudio(duration) {
-  if (!introAudio || introAudio.paused) return;
-  const step = introAudio.volume / (duration / 50);
-  const fade = setInterval(() => {
-    introAudio.volume = Math.max(0, introAudio.volume - step);
-    if (introAudio.volume <= 0) { clearInterval(fade); introAudio.pause(); introAudio.currentTime = 0; introAudio.volume = 1; }
-  }, 50);
-}
-
 let introTimers=[];
 function playIntro(champ) {
   introTimers.forEach(clearTimeout); introTimers=[];
@@ -1313,10 +1299,6 @@ function playIntro(champ) {
   ov.className='';
   void ov.offsetWidth;
 
-  // Lancer la musique (peut être bloqué sans geste utilisateur au 1er chargement)
-  introAudio.currentTime = 0; introAudio.volume = 1;
-  introAudio.play().catch(() => {});
-
   introTimers.push(setTimeout(()=>{ logo.classList.add('p1'); tag.classList.add('show'); }, 700));
   introTimers.push(setTimeout(()=>{
     logo.classList.remove('p1'); logo.classList.add('p2');
@@ -1324,13 +1306,12 @@ function playIntro(champ) {
     ce.innerHTML=`<div class="intro-champ-eyebrow">★ LEADER</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS</div>`;
     ce.classList.add('show');
   }, 2100));
-  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); fadeOutAudio(500); }, 4000));
+  introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); }, 4000));
   introTimers.push(setTimeout(()=>{ ov.classList.add('hidden'); }, 4500));
 
   document.getElementById('intro-skip').onclick=()=>{
     introTimers.forEach(clearTimeout);
     ov.classList.add('hidden');
-    fadeOutAudio(400);
   };
 }
 
