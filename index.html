@@ -1259,10 +1259,12 @@ function processFile(file) {
     const newE=parseWhatsApp(e.target.result);
     if(!newE.length){showError('Aucune partie trouvée. Vérifiez que le fichier contient des scores "La Table des Savoirs".');return;}
     const stored=await loadEntries();
+    const wasEmpty=stored.length===0;
     await buildRanking([...stored,...newE]);
     hideMsg();
     const total=Object.values(byDate).reduce((s,d)=>s+d.length,0);
     showInfo(`✓ Données chargées · ${total} parties au total`);
+    if(wasEmpty && allStats.length) playIntro(allStats[0]);
   };
   reader.onerror=()=>showError('Impossible de lire le fichier.');
   reader.readAsText(file,'UTF-8');
