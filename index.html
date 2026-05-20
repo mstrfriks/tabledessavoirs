@@ -1214,14 +1214,8 @@ function parseMsgStart(line) {
   if (fB) return { date:fB[1], time:fB[2], player:fB[3].trim(), content:fB[4] };
   return null;
 }
-// Cycle 12h→12h : un message envoyé avant midi appartient au quiz de la veille
-function quizDate(date, time) {
-  if (!time || time >= '12:00') return date;
-  const [d, m, y] = date.split('/');
-  const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-  dt.setDate(dt.getDate() - 1);
-  return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + '/' + dt.getFullYear();
-}
+const MONTHS_FR={'janvier':'01','février':'02','mars':'03','avril':'04','mai':'05','juin':'06','juillet':'07','août':'08','septembre':'09','octobre':'10','novembre':'11','décembre':'12'};
+const TABLE_DATE_RE=/La Table des Savoirs\s*-\s*(\d{1,2})\s+(\w+)\s+(\d{4})/i;
 const QUIZ_RE=/Quiz[^(]*\((\d+)\/10\)/i, TABLE_RE=/La Table des Savoirs/i;
 function parseWhatsApp(text) {
   const lines = text.replace(/^﻿/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n')
@@ -1231,7 +1225,13 @@ function parseWhatsApp(text) {
     const msg=parseMsgStart(lines[i]); if(!msg){i++;continue;}
     let j=i+1; while(j<lines.length&&!parseMsgStart(lines[j]))j++;
     const full=msg.content+(j>i+1?'\n'+lines.slice(i+1,j).join('\n'):'');
-    if(TABLE_RE.test(full)){const sm=full.match(QUIZ_RE);if(sm)entries.push({date:quizDate(msg.date,msg.time),player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});}
+    if(TABLE_RE.test(full)){
+      const sm=full.match(QUIZ_RE); if(!sm){i=j;continue;}
+      const dm=full.match(TABLE_DATE_RE);
+      let date=msg.date;
+      if(dm){const mo=MONTHS_FR[dm[2].toLowerCase()];if(mo)date=String(dm[1]).padStart(2,'0')+'/'+mo+'/'+dm[3];}
+      entries.push({date,player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});
+    }
     i=j;
   }
   return entries;
