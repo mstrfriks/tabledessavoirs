@@ -812,9 +812,45 @@ function renderLeaderboard(animate) {
   document.getElementById('header-subtitle').textContent =
     `${curSlabel} · JOURNÉE ${allDays.length}/${allDays.length} · QUIZ FAMILIAL`;
 
+  // Days remaining in current season (month)
+  let daysLeft = null;
+  if (curSk.length) {
+    const [sm, sy] = curSk[curSk.length - 1].split('/');
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0); // last day of season month
+    daysLeft = Math.round((seasonEnd - todayMidnight) / 86400000);
+  }
+  const endgame = daysLeft !== null && daysLeft <= 10;
+
   const leadersNames = leaders.map(s => esc(dn(s.name))).join(' · ');
-  const eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length}` : `★ LEADER · J${allDays.length}`;
-  const tag = isExAequo ? 'Ex-æquo en tête du championnat' : 'Tête du championnat';
+  let eyebrow, tag, vsLabel;
+  if (!endgame) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length}` : `★ LEADER · J${allDays.length}`;
+    tag     = isExAequo ? 'Ex-æquo en tête du championnat' : 'Tête du championnat';
+    vsLabel = '★ DUEL POUR LA COURONNE';
+  } else if (daysLeft <= 0) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · SAISON TERMINÉE` : `🏁 CHAMPION · SAISON TERMINÉE`;
+    tag     = isExAequo ? 'Ex-æquo — la saison vient de s\'achever' : 'La saison s\'achève — le verdict est tombé';
+    vsLabel = '⚡ ULTIME CONFRONTATION';
+  } else if (daysLeft === 1) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · J-1` : `⚡ LEADER · J${allDays.length} · J-1`;
+    tag     = isExAequo ? 'Tout se joue ce soir — dernière chance !' : 'Dernière chance — la saison se termine demain !';
+    vsLabel = '🔥 TOUT SE JOUE CE SOIR';
+  } else if (daysLeft <= 3) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · J-${daysLeft}` : `⚡ LEADER · J${allDays.length} · J-${daysLeft}`;
+    tag     = isExAequo ? `Sprint final — plus que ${daysLeft} jours, tout peut basculer !` : `Sprint final — ${daysLeft} jours pour renverser la table !`;
+    vsLabel = '🔥 DUEL DÉCISIF — PLUS RIEN À PERDRE';
+  } else if (daysLeft <= 7) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · J-${daysLeft}` : `★ LEADER · J${allDays.length} · J-${daysLeft}`;
+    tag     = isExAequo ? `La couronne se joue dans ${daysLeft} jours — bataille royale` : `La couronne se joue dans ${daysLeft} jours`;
+    vsLabel = '⚡ AFFRONTEMENT DÉCISIF';
+  } else {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · J-${daysLeft}` : `★ LEADER · J${allDays.length} · J-${daysLeft}`;
+    tag     = isExAequo ? `Compte à rebours — ${daysLeft} jours avant le verdict` : `Compte à rebours — ${daysLeft} jours avant la fin de saison`;
+    vsLabel = '★ DUEL POUR LA COURONNE';
+  }
+
   const champPct = rival ? champ.total / (champ.total + rival.total) * 100 : 100;
   const gap = rival ? champ.total - rival.total : 0;
   document.getElementById('ucb-hero').innerHTML =
@@ -830,7 +866,7 @@ function renderLeaderboard(animate) {
       </div>
     </div>
     ${rival && !tiedAtTop ? `<div class="ucb-hero-right">
-      <div class="ucb-vs-label">★ DUEL POUR LA COURONNE</div>
+      <div class="ucb-vs-label">${vsLabel}</div>
       <div class="ucb-vs-row">
         <div><div class="ucb-vs-name">${esc(dn(champ.name))}</div><div class="ucb-vs-pts">${champ.total} PTS</div></div>
         <div class="ucb-vs-vs">vs</div>
@@ -1144,8 +1180,24 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
   const saison = sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01';
   const lines = [];
 
+  // Days left in current season
+  let waEndgameMsg = '';
+  if (sk.length) {
+    const [sm, sy] = sk[sk.length - 1].split('/');
+    const today = new Date();
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0);
+    const dl = Math.round((seasonEnd - todayMid) / 86400000);
+    if (dl <= 0)       waEndgameMsg = '🏁 Saison terminée — le verdict est tombé !';
+    else if (dl === 1) waEndgameMsg = '🔥 DERNIÈRE CHANCE — La saison se termine demain !';
+    else if (dl <= 3)  waEndgameMsg = `⚡ SPRINT FINAL — Plus que ${dl} jours pour tout renverser !`;
+    else if (dl <= 7)  waEndgameMsg = `⏳ La couronne se joue dans ${dl} jours — tout est encore possible !`;
+    else if (dl <= 10) waEndgameMsg = `📅 Compte à rebours — J-${dl} avant la fin de saison`;
+  }
+
   // Header
   lines.push(`🏆 UCB · ${saison} · J${allDays.length}`);
+  if (waEndgameMsg) { lines.push(waEndgameMsg); }
   lines.push('');
 
   // Best player(s) of the day
