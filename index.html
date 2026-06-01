@@ -1036,7 +1036,7 @@ function seasonLabel(mk) {
 
 function computeSeasonStats(mk) {
   const [m, y] = mk.split('/');
-  const days = allDays.filter(d => { const [,dm,dy]=d.split('/'); return dm===m && dy===y; });
+  const days = Object.keys(byDate).filter(d => { const [,dm,dy]=d.split('/'); return dm===m && dy===y; }).sort((a,b)=>dateToInt(a)-dateToInt(b));
   const players = [...new Set(days.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
   const sorted = players.map(name => {
     const series = days.map(d => { const e=(byDate[d]||[]).find(e=>e.player===name); return e?e.score:null; });
