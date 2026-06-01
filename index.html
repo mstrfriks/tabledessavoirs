@@ -665,7 +665,9 @@
       <div style="margin-top:1.2rem;padding-top:1.1rem;border-top:1px solid var(--border-dim)">
         <div style="font-size:10px;letter-spacing:.3em;color:var(--text-dim);font-weight:800;text-transform:uppercase;margin-bottom:.6rem">📲 Partager sur WhatsApp</div>
         <button id="copy-wa-btn" class="save-btn">Copier le message classement</button>
+        <button id="copy-wa-final-btn" class="save-btn" style="margin-top:.5rem;background:linear-gradient(135deg,#b8860b,#d4af37)">🏆 Copier le bilan de fin de saison</button>
         <p id="copy-wa-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Message copié !</p>
+        <p id="copy-wa-final-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Bilan copié !</p>
       </div>
       <div style="margin-top:1rem">
         <button id="clear-btn">✕ Effacer toutes les données</button>
@@ -1295,6 +1297,56 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
 
   navigator.clipboard.writeText(lines.join('\n')).then(() => {
     const el = document.getElementById('copy-wa-msg');
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2500);
+  });
+});
+
+document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
+  if (!allStats.length) return;
+  const sk = getAvailableSeasons();
+  const saison = sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01';
+  const lines = [];
+  const medals = ['🥇','🥈','🥉'];
+  const champ = allStats[0];
+  const leaders = allStats.filter(s => s.rank === 1);
+  const isExAequo = leaders.length > 1;
+
+  lines.push(`🏆 UCB · ${saison} · RÉSULTATS FINAUX`);
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+
+  if (isExAequo) {
+    lines.push(`🎉 EX-ÆQUO AU SOMMET !`);
+    lines.push(leaders.map(s => `👑 ${dn(s.name)}`).join(' & '));
+    lines.push(`   ${champ.total} points · ${allDays.length} journées`);
+  } else {
+    lines.push(`🎉 CHAMPION DE LA SAISON !`);
+    lines.push(`👑 ${dn(champ.name)}`);
+    lines.push(`   ${champ.total} pts · moy. ${champ.avg.toFixed(2)}/10 · ${champ.played}/${allDays.length} jours joués`);
+  }
+  lines.push('');
+
+  lines.push('📊 Classement final :');
+  allStats.forEach((p, i) => {
+    const medal = medals[i] || `${i + 1}.`;
+    const avgStr = p.played ? ` · moy. ${p.avg.toFixed(2)}` : '';
+    lines.push(`${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
+  });
+  lines.push('');
+
+  const bestAvg = [...allStats].filter(p => p.played > 0).sort((a, b) => b.avg - a.avg)[0];
+  const bestSingle = [...allStats].sort((a, b) => b.best - a.best)[0];
+  const mostAssiduous = [...allStats].sort((a, b) => b.played - a.played)[0];
+  lines.push('🎯 Records de la saison :');
+  if (bestAvg) lines.push(`📈 Meilleure moyenne : ${dn(bestAvg.name)} (${bestAvg.avg.toFixed(2)}/10)`);
+  if (bestSingle) lines.push(`⚡ Meilleur score : ${dn(bestSingle.name)} (${bestSingle.best}/10)`);
+  if (mostAssiduous) lines.push(`🏅 Plus assidu·e : ${dn(mostAssiduous.name)} (${mostAssiduous.played}/${allDays.length} jours)`);
+  lines.push('');
+  lines.push(`👉 ${location.origin + location.pathname}`);
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const el = document.getElementById('copy-wa-final-msg');
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 2500);
   });
