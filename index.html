@@ -829,10 +829,14 @@ function renderLeaderboard(animate) {
     eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length}` : `★ LEADER · J${allDays.length}`;
     tag     = isExAequo ? 'Ex-æquo en tête du championnat' : 'Tête du championnat';
     vsLabel = '★ DUEL POUR LA COURONNE';
-  } else if (daysLeft <= 0) {
+  } else if (daysLeft < 0) {
     eyebrow = isExAequo ? `= EX-ÆQUO · SAISON TERMINÉE` : `🏁 CHAMPION · SAISON TERMINÉE`;
     tag     = isExAequo ? 'Ex-æquo — la saison vient de s\'achever' : 'La saison s\'achève — le verdict est tombé';
     vsLabel = '⚡ ULTIME CONFRONTATION';
+  } else if (daysLeft === 0) {
+    eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · DERNIER SOIR` : `⚡ LEADER · J${allDays.length} · DERNIER SOIR`;
+    tag     = isExAequo ? 'Tout se joue ce soir — dernière chance !' : 'Tout se joue ce soir — la saison se termine aujourd\'hui !';
+    vsLabel = '🔥 TOUT SE JOUE CE SOIR';
   } else if (daysLeft === 1) {
     eyebrow = isExAequo ? `= EX-ÆQUO · J${allDays.length} · J-1` : `⚡ LEADER · J${allDays.length} · J-1`;
     tag     = isExAequo ? 'Tout se joue ce soir — dernière chance !' : 'Dernière chance — la saison se termine demain !';
@@ -1181,61 +1185,113 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
   const lines = [];
 
   // Days left in current season
-  let waEndgameMsg = '';
+  let dl = null;
   if (sk.length) {
     const [sm, sy] = sk[sk.length - 1].split('/');
     const today = new Date();
     const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0);
-    const dl = Math.round((seasonEnd - todayMid) / 86400000);
-    if (dl <= 0)       waEndgameMsg = '🏁 Saison terminée — le verdict est tombé !';
-    else if (dl === 1) waEndgameMsg = '🔥 DERNIÈRE CHANCE — La saison se termine demain !';
-    else if (dl <= 3)  waEndgameMsg = `⚡ SPRINT FINAL — Plus que ${dl} jours pour tout renverser !`;
-    else if (dl <= 7)  waEndgameMsg = `⏳ La couronne se joue dans ${dl} jours — tout est encore possible !`;
-    else if (dl <= 10) waEndgameMsg = `📅 Compte à rebours — J-${dl} avant la fin de saison`;
+    dl = Math.round((seasonEnd - todayMid) / 86400000);
   }
 
-  // Header
-  lines.push(`🏆 UCB · ${saison} · J${allDays.length}`);
-  if (waEndgameMsg) { lines.push(waEndgameMsg); }
-  lines.push('');
+  const isFinalDay = dl !== null && dl <= 0;
 
-  // Best player(s) of the day
-  if (allDays.length) {
-    const todayEntries = byDate[allDays[allDays.length - 1]] || [];
-    if (todayEntries.length) {
-      const maxScore = Math.max(...todayEntries.map(e => e.score));
-      const best = todayEntries.filter(e => e.score === maxScore);
-      const names = best.map(e => dn(e.player)).join(' & ');
-      lines.push(`⚡ Meilleur du jour : ${names} (${maxScore}/10)`);
-      lines.push('');
+  if (isFinalDay) {
+    // ── MESSAGE DE FIN DE SAISON ─────────────────────────────────────────
+    const champ = allStats[0];
+    const leaders = allStats.filter(s => s.rank === 1);
+    const isExAequo = leaders.length > 1;
+    const medals = ['🥇','🥈','🥉'];
+
+    // Header épique
+    lines.push(`🏆 UCB · ${saison} · RÉSULTATS FINAUX`);
+    lines.push('━━━━━━━━━━━━━━━━━━━━━━');
+    lines.push('');
+
+    // Champion
+    if (isExAequo) {
+      lines.push(`🎉 EX-ÆQUO AU SOMMET !`);
+      lines.push(leaders.map(s => `👑 ${dn(s.name)}`).join(' & '));
+      lines.push(`   ${champ.total} points · ${allDays.length} journées`);
+    } else {
+      lines.push(`🎉 CHAMPION DE LA SAISON !`);
+      lines.push(`👑 ${dn(champ.name)}`);
+      lines.push(`   ${champ.total} pts · moy. ${champ.avg.toFixed(2)}/10 · ${champ.played}/${allDays.length} jours joués`);
     }
-  }
+    lines.push('');
 
-  // Ranking recap
-  const medals = ['🥇','🥈','🥉'];
-  lines.push('📊 Classement :');
-  allStats.slice(0, 3).forEach((p, i) => {
-    lines.push(`${medals[i]} ${dn(p.name)} — ${p.total} pts`);
-  });
-  lines.push('');
-
-  // Significant moves (any position change)
-  const movers = allStats.filter(p => {
-    const prev = prevRankOf[p.name];
-    return prev != null && prev !== p.rank;
-  });
-  if (movers.length) {
-    lines.push('📈 Mouvements :');
-    movers.forEach(p => {
-      const delta = prevRankOf[p.name] - p.rank;
-      const arrow = delta > 0 ? `▲${delta}` : `▼${Math.abs(delta)}`;
-      lines.push(`${arrow} ${dn(p.name)} (${p.rank === 1 ? '1ère' : p.rank + 'e'} place)`);
+    // Classement complet
+    lines.push('📊 Classement final :');
+    allStats.forEach((p, i) => {
+      const medal = medals[i] || `${i + 1}.`;
+      const avgStr = p.played ? ` · moy. ${p.avg.toFixed(2)}` : '';
+      lines.push(`${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
     });
     lines.push('');
-  }
 
-  lines.push(`👉 ${location.origin + location.pathname}`);
+    // Stats de saison
+    const mostAssiduous = [...allStats].sort((a, b) => b.played - a.played)[0];
+    const bestAvg = [...allStats].filter(p => p.played > 0).sort((a, b) => b.avg - a.avg)[0];
+    const bestSingle = [...allStats].sort((a, b) => b.best - a.best)[0];
+    lines.push('🎯 Records de la saison :');
+    if (bestAvg) lines.push(`📈 Meilleure moyenne : ${dn(bestAvg.name)} (${bestAvg.avg.toFixed(2)}/10)`);
+    if (bestSingle) lines.push(`⚡ Meilleur score : ${dn(bestSingle.name)} (${bestSingle.best}/10)`);
+    if (mostAssiduous) lines.push(`🏅 Plus assidu·e : ${dn(mostAssiduous.name)} (${mostAssiduous.played}/${allDays.length} jours)`);
+    lines.push('');
+    lines.push(`👉 ${location.origin + location.pathname}`);
+
+  } else {
+    // ── MESSAGE EN COURS DE SAISON ───────────────────────────────────────
+    let waEndgameMsg = '';
+    if (dl !== null) {
+      if (dl === 1)      waEndgameMsg = '🔥 DERNIÈRE CHANCE — La saison se termine demain !';
+      else if (dl <= 3)  waEndgameMsg = `⚡ SPRINT FINAL — Plus que ${dl} jours pour tout renverser !`;
+      else if (dl <= 7)  waEndgameMsg = `⏳ La couronne se joue dans ${dl} jours — tout est encore possible !`;
+      else if (dl <= 10) waEndgameMsg = `📅 Compte à rebours — J-${dl} avant la fin de saison`;
+    }
+
+    // Header
+    lines.push(`🏆 UCB · ${saison} · J${allDays.length}`);
+    if (waEndgameMsg) { lines.push(waEndgameMsg); }
+    lines.push('');
+
+    // Best player(s) of the day
+    if (allDays.length) {
+      const todayEntries = byDate[allDays[allDays.length - 1]] || [];
+      if (todayEntries.length) {
+        const maxScore = Math.max(...todayEntries.map(e => e.score));
+        const best = todayEntries.filter(e => e.score === maxScore);
+        const names = best.map(e => dn(e.player)).join(' & ');
+        lines.push(`⚡ Meilleur du jour : ${names} (${maxScore}/10)`);
+        lines.push('');
+      }
+    }
+
+    // Ranking recap (top 3)
+    const medals = ['🥇','🥈','🥉'];
+    lines.push('📊 Classement :');
+    allStats.slice(0, 3).forEach((p, i) => {
+      lines.push(`${medals[i]} ${dn(p.name)} — ${p.total} pts`);
+    });
+    lines.push('');
+
+    // Significant moves
+    const movers = allStats.filter(p => {
+      const prev = prevRankOf[p.name];
+      return prev != null && prev !== p.rank;
+    });
+    if (movers.length) {
+      lines.push('📈 Mouvements :');
+      movers.forEach(p => {
+        const delta = prevRankOf[p.name] - p.rank;
+        const arrow = delta > 0 ? `▲${delta}` : `▼${Math.abs(delta)}`;
+        lines.push(`${arrow} ${dn(p.name)} (${p.rank === 1 ? '1ère' : p.rank + 'e'} place)`);
+      });
+      lines.push('');
+    }
+
+    lines.push(`👉 ${location.origin + location.pathname}`);
+  }
 
   navigator.clipboard.writeText(lines.join('\n')).then(() => {
     const el = document.getElementById('copy-wa-msg');
