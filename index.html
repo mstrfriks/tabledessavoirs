@@ -786,12 +786,17 @@ function computeStats() {
 
   const players = [...new Set(allDays.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
 
-  // Compute season winners (one champion per season = highest total for that month)
-  const seasonWinnerMap = {}; // name -> count
-  getAvailableSeasons().forEach(mk => {
+  // Compute past season wins (completed seasons only, exclude current)
+  const pastSeasons = seasons.slice(0, -1);
+  const seasonWinnerMap = {};
+  pastSeasons.forEach(mk => {
     const s = computeSeasonStats(mk);
     if (s.length) { const w = s[0]; seasonWinnerMap[w.name] = (seasonWinnerMap[w.name] || 0) + 1; }
   });
+
+  // Defending champion = winner of the immediately previous season
+  const prevSk = seasons.length >= 2 ? seasons[seasons.length - 2] : null;
+  const prevSeasonWinner = prevSk ? (computeSeasonStats(prevSk)[0]?.name ?? null) : null;
 
   allStats = players.map(name => {
     const series  = allDays.map(d => { const e = (byDate[d] || []).find(e => e.player === name); return e ? e.score : null; });
@@ -800,7 +805,8 @@ function computeStats() {
     const avg     = played.length ? total / played.length : 0;
     const best    = played.length ? Math.max(...played) : 0;
     const seasonWins = seasonWinnerMap[name] || 0;
-    return { name, series, total, avg, best, played: played.length, seasonWins };
+    const isDefendingChamp = name === prevSeasonWinner;
+    return { name, series, total, avg, best, played: played.length, seasonWins, isDefendingChamp };
   });
   allStats.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
   allStats.forEach((s, i) => {
@@ -923,7 +929,7 @@ function renderLeaderboard(animate) {
       : '<span class="ucb-rank-delta eq">—</span>';
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
       <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
-      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.seasonWins>0?` <span style="font-style:normal;font-size:.7em">🏆${p.seasonWins>1?'×'+p.seasonWins:''}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
+      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${p.seasonWins>1?` <span style="font-style:normal;font-size:.7em">🏆×${p.seasonWins}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
       <div class="ucb-spark">${p.series.map(s => s==null
