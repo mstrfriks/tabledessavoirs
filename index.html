@@ -772,10 +772,19 @@ function dn(p) { return nameMap[p] || p; }
 
 /* ── STATS ─────────────────────────────────────────────────────────────── */
 function computeStats() {
-  allDays = Object.keys(byDate).sort((a, b) => dateToInt(a) - dateToInt(b));
+  // Filter allDays to current season only (latest month)
+  const allDaysRaw = Object.keys(byDate).sort((a, b) => dateToInt(a) - dateToInt(b));
+  const seasons = getAvailableSeasons();
+  const curSk = seasons.length ? seasons[seasons.length - 1] : null;
+  if (curSk) {
+    const [curM, curY] = curSk.split('/');
+    allDays = allDaysRaw.filter(d => { const [,m,y] = d.split('/'); return m === curM && y === curY; });
+  } else {
+    allDays = allDaysRaw;
+  }
   curDayIdx = Math.max(0, allDays.length - 1);
 
-  const players = [...new Set(Object.values(byDate).flat().map(e => e.player))];
+  const players = [...new Set(allDays.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
 
   // Compute season winners (one champion per season = highest total for that month)
   const seasonWinnerMap = {}; // name -> count
@@ -1015,7 +1024,7 @@ const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','A
 
 function getAvailableSeasons() {
   const set = new Set();
-  allDays.forEach(d => { const [,m,y] = d.split('/'); set.add(m+'/'+y); });
+  Object.keys(byDate).forEach(d => { const [,m,y] = d.split('/'); set.add(m+'/'+y); });
   return [...set].sort((a, b) => {
     const [am,ay]=a.split('/'), [bm,by]=b.split('/');
     return (parseInt(ay)*12+parseInt(am)) - (parseInt(by)*12+parseInt(bm));
