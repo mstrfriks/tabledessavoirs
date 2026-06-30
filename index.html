@@ -650,6 +650,7 @@
     <button class="modal-close" id="close-settings">✕</button>
     <div class="stab-nav">
       <button class="stab-btn active" data-stab="import">📥 Importer</button>
+      <button class="stab-btn"        data-stab="data">🗒 Scores</button>
       <button class="stab-btn"        data-stab="players">👥 Joueurs</button>
     </div>
     <div id="stab-import" class="stab-pane active">
@@ -672,6 +673,12 @@
       <div style="margin-top:1rem">
         <button id="clear-btn">✕ Effacer toutes les données</button>
       </div>
+    </div>
+    <div id="stab-data" class="stab-pane">
+      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:1rem">Corrigez un score mal lu ou supprimez une partie erronée. Un seul score par joueur et par jour.</p>
+      <div id="data-list" style="max-height:340px;overflow-y:auto;margin-bottom:1rem"></div>
+      <button class="save-btn" id="save-data-btn">Sauvegarder les corrections</button>
+      <p id="data-saved-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.6rem">✓ Corrections enregistrées</p>
     </div>
     <div id="stab-players" class="stab-pane">
       <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:1rem">Définissez le nom affiché pour chaque joueur. Laissez vide pour utiliser le nom original.</p>
@@ -767,6 +774,7 @@ let prevRankOf = {};
 let curDayIdx  = 0;
 let curView      = 'leaderboard';
 let curSeasonKey = null; // 'MM/YYYY'
+let authToken    = sessionStorage.getItem('tds_auth') || ''; // write secret (entered via PIN)
 
 function dn(p) { return nameMap[p] || p; }
 
@@ -786,17 +794,23 @@ function computeStats() {
 
   const players = [...new Set(allDays.flatMap(d => (byDate[d]||[]).map(e => e.player)))];
 
-  // Compute past season wins (completed seasons only, exclude current)
+  // Compute past season podiums (completed seasons only, exclude current).
+  // Medals cumulate like World Cup stars; ties share a rank (e.g. two 1st = two golds).
   const pastSeasons = seasons.slice(0, -1);
-  const seasonWinnerMap = {};
+  const medalMap = {}; // name -> { gold, silver, bronze }
   pastSeasons.forEach(mk => {
-    const s = computeSeasonStats(mk);
-    if (s.length) { const w = s[0]; seasonWinnerMap[w.name] = (seasonWinnerMap[w.name] || 0) + 1; }
+    computeSeasonStats(mk).forEach(p => {
+      if (p.rank > 3) return;
+      const m = medalMap[p.name] || (medalMap[p.name] = { gold: 0, silver: 0, bronze: 0 });
+      if (p.rank === 1) m.gold++;
+      else if (p.rank === 2) m.silver++;
+      else m.bronze++;
+    });
   });
 
-  // Defending champion = winner of the immediately previous season
+  // Defending champion(s) = winner(s) of the immediately previous season (ties included)
   const prevSk = seasons.length >= 2 ? seasons[seasons.length - 2] : null;
-  const prevSeasonWinner = prevSk ? (computeSeasonStats(prevSk)[0]?.name ?? null) : null;
+  const prevWinners = prevSk ? computeSeasonStats(prevSk).filter(s => s.rank === 1).map(s => s.name) : [];
 
   allStats = players.map(name => {
     const series  = allDays.map(d => { const e = (byDate[d] || []).find(e => e.player === name); return e ? e.score : null; });
@@ -804,9 +818,10 @@ function computeStats() {
     const total   = played.reduce((a, b) => a + b, 0);
     const avg     = played.length ? total / played.length : 0;
     const best    = played.length ? Math.max(...played) : 0;
-    const seasonWins = seasonWinnerMap[name] || 0;
-    const isDefendingChamp = name === prevSeasonWinner;
-    return { name, series, total, avg, best, played: played.length, seasonWins, isDefendingChamp };
+    const medals  = medalMap[name] || { gold: 0, silver: 0, bronze: 0 };
+    const seasonWins = medals.gold;
+    const isDefendingChamp = prevWinners.includes(name);
+    return { name, series, total, avg, best, played: played.length, medals, seasonWins, isDefendingChamp };
   });
   allStats.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'fr'));
   allStats.forEach((s, i) => {
@@ -829,15 +844,8 @@ function renderLeaderboard(animate) {
   document.getElementById('header-subtitle').textContent =
     `${curSlabel} · JOURNÉE ${allDays.length}/${allDays.length} · QUIZ FAMILIAL`;
 
-  // Days remaining in current season (month)
-  let daysLeft = null;
-  if (curSk.length) {
-    const [sm, sy] = curSk[curSk.length - 1].split('/');
-    const today = new Date();
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0); // last day of season month
-    daysLeft = Math.round((seasonEnd - todayMidnight) / 86400000);
-  }
+  // Days remaining in current season (fin anticipée incluse)
+  const daysLeft = seasonDaysLeft();
   const endgame = daysLeft !== null && daysLeft <= 10;
 
   const leadersNames = leaders.map(s => esc(dn(s.name))).join(' · ');
@@ -916,6 +924,13 @@ function renderLeaderboard(animate) {
   const SUBS = ['★ Leader','◆ Challenger','◇ Outsider'];
   const MID_SUBS = ['· Prétendant','· En embuscade','· Tapi dans l\'ombre','· Dans la mêlée','· À l\'affût','· En campagne'];
   const NEG_SUBS = ['· Lanterne rouge','· En perdition','· À la traîne'];
+  const medalBadges = m => {
+    const parts = [['🥇',m.gold],['🥈',m.silver],['🥉',m.bronze]].filter(([,n]) => n > 0)
+      .map(([e,n]) => `${e}${n > 1 ? '×' + n : ''}`);
+    return parts.length
+      ? ` <span style="font-style:normal;font-size:.7em" title="Palmarès saisons — ${m.gold}🥇 ${m.silver}🥈 ${m.bronze}🥉">${parts.join(' ')}</span>`
+      : '';
+  };
   document.getElementById('standings-rows').innerHTML = allStats.map((p, i) => {
     const fromLast = allStats.length - 1 - i;
     const sub = p.rank <= 3 ? SUBS[p.rank - 1]
@@ -929,7 +944,7 @@ function renderLeaderboard(animate) {
       : '<span class="ucb-rank-delta eq">—</span>';
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
       <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
-      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${p.seasonWins>1?` <span style="font-style:normal;font-size:.7em">🏆×${p.seasonWins}</span>`:''}</div><div class="ucb-row-sub">${sub}</div></div>
+      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${medalBadges(p.medals)}</div><div class="ucb-row-sub">${sub}</div></div>
       <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
       <div class="ucb-spark">${p.series.map(s => s==null
@@ -987,11 +1002,21 @@ function renderHistory() {
   document.querySelectorAll('.ucb-day-chip').forEach(btn =>
     btn.addEventListener('click', () => { curDayIdx = parseInt(btn.dataset.idx); flashAndRender(); }));
 
+  // Competition ranking for the day (ties share the same rank)
+  const scoreCount = {};
+  played.forEach(p => { scoreCount[p.score] = (scoreCount[p.score] || 0) + 1; });
+  let _dr = 0, _prevScore = null;
+  const dayRankOf = dayRanked.map((p, i) => {
+    if (p.score == null) return null;
+    if (p.score !== _prevScore) { _dr = i + 1; _prevScore = p.score; }
+    return _dr;
+  });
   document.getElementById('day-grid').innerHTML = dayRanked.map((p, i) => {
     const dnp = p.score == null;
     const win = !dnp && p.score === winScore;
+    const tied = !dnp && scoreCount[p.score] > 1;
     return `<div class="ucb-day-card${win?' winner':''}${dnp?' dnp':''}">
-      <div class="ucb-day-card-rank">${dnp?'—':String(i+1).padStart(2,'0')}</div>
+      <div class="ucb-day-card-rank">${dnp?'—':(tied?'<span style="font-size:.5em;vertical-align:middle;opacity:.7">=</span>':'')+String(dayRankOf[i]).padStart(2,'0')}</div>
       <div class="ucb-day-card-name">${esc(dn(p.name))}</div>
       ${dnp
         ? `<div class="ucb-day-card-score" style="color:var(--text-dim)">—<sub>/10</sub></div>`
@@ -1038,6 +1063,29 @@ function getAvailableSeasons() {
 }
 function seasonLabel(mk) {
   return 'Saison ' + String(getAvailableSeasons().indexOf(mk) + 1).padStart(2, '0');
+}
+
+// Jours restants dans la saison courante (négatif = terminée).
+// Règle 1 : le dernier jour calendaire se clôt le lendemain à midi (frontière quizDayMidnight).
+// Règle 2 (fin anticipée) : si tous les joueurs actifs de la saison ont joué le dernier jour,
+// la saison est close immédiatement, sans attendre le délai du lendemain midi.
+function seasonDaysLeft() {
+  const sk = getAvailableSeasons();
+  if (!sk.length) return null;
+  const [sm, sy] = sk[sk.length - 1].split('/');
+  const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0); // dernier jour du mois
+  let dl = Math.round((seasonEnd - quizDayMidnight()) / 86400000);
+  const pad = n => String(n).padStart(2, '0');
+  const lastDayStr = pad(seasonEnd.getDate()) + '/' + pad(seasonEnd.getMonth() + 1) + '/' + seasonEnd.getFullYear();
+  const lastDayPlayers = new Set((byDate[lastDayStr] || []).map(e => e.player));
+  const allActivePlayed = allStats.length > 0 && allStats.every(s => lastDayPlayers.has(s.name));
+  if (dl >= 0 && allActivePlayed) dl = -1;
+  return dl;
+}
+
+// « Tout le monde » quand tous les joueurs détiennent un record à égalité, sinon la liste des noms.
+function fmtRecordHolders(names) {
+  return (names.length > 1 && names.length === allStats.length) ? 'Tout le monde' : names.join(' & ');
 }
 
 function computeSeasonStats(mk) {
@@ -1149,9 +1197,14 @@ function openSettings(tab) {
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); hideMsg(); }
 function openPin() { document.getElementById('pin-input').value=''; document.getElementById('pin-error').textContent=''; document.getElementById('pin-overlay').classList.add('open'); setTimeout(()=>document.getElementById('pin-input').focus(),50); }
 function closePin() { document.getElementById('pin-overlay').classList.remove('open'); }
-function checkPin() {
-  if (document.getElementById('pin-input').value === '1988') { closePin(); openSettings('import'); }
-  else { document.getElementById('pin-error').textContent='Code incorrect'; document.getElementById('pin-input').value=''; document.getElementById('pin-input').focus(); }
+async function checkPin() {
+  const v = document.getElementById('pin-input').value;
+  const fail = (m) => { document.getElementById('pin-error').textContent = m; document.getElementById('pin-input').value=''; document.getElementById('pin-input').focus(); };
+  try {
+    const r = await fetch('/api/auth', { method:'POST', headers:{ 'X-Auth-Token': v } });
+    if (r.ok) { authToken = v; sessionStorage.setItem('tds_auth', v); closePin(); openSettings('import'); return; }
+    fail('Code incorrect');
+  } catch (_) { fail('Serveur injoignable'); }
 }
 
 document.getElementById('settings-btn').addEventListener('click', openPin);
@@ -1167,6 +1220,7 @@ document.querySelectorAll('.stab-btn').forEach(btn => btn.addEventListener('clic
   document.querySelectorAll('.stab-btn').forEach(b => b.classList.toggle('active', b.dataset.stab===tab));
   document.querySelectorAll('.stab-pane').forEach(p => p.classList.toggle('active', p.id==='stab-'+tab));
   if (tab==='players') renderPlayersSettings();
+  if (tab==='data') renderDataSettings();
 }));
 
 /* ── PLAYERS SETTINGS ──────────────────────────────────────────────────── */
@@ -1186,6 +1240,59 @@ document.getElementById('save-names-btn').addEventListener('click', async () => 
   msg.style.display='block'; setTimeout(()=>{ msg.style.display='none'; }, 2000);
 });
 
+/* ── DATA EDITOR ───────────────────────────────────────────────────────── */
+function renderDataSettings() {
+  const c = document.getElementById('data-list');
+  const dates = Object.keys(byDate).sort((a,b)=>dateToInt(b)-dateToInt(a));
+  if (!dates.length) { c.innerHTML='<p style="color:var(--text-dim);text-align:center">Aucune donnée — importez d\'abord.</p>'; return; }
+  c.innerHTML = dates.map(d => {
+    const [dd,mm,yy] = d.split('/');
+    const dow = DAY_NAMES[new Date(`${yy}-${mm}-${dd}`).getDay()];
+    const rows = [...byDate[d]].sort((a,b)=>b.score-a.score).map(e =>
+      `<div class="data-row" data-date="${esc(e.date)}" data-player="${esc(e.player)}" style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0">
+         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(dn(e.player))}</span>
+         <input class="data-score" type="number" min="0" max="10" value="${e.score}" style="width:56px;text-align:center">
+         <button type="button" class="data-del" title="Supprimer" style="background:none;border:1px solid var(--border-dim);color:var(--danger);border-radius:6px;width:28px;height:28px;cursor:pointer">✕</button>
+       </div>`).join('');
+    return `<div style="margin-bottom:.8rem"><div style="font-size:10px;letter-spacing:.2em;color:var(--accent);font-weight:800;text-transform:uppercase;margin-bottom:.3rem">${dow} ${esc(d)}</div>${rows}</div>`;
+  }).join('');
+  c.querySelectorAll('.data-del').forEach(btn => btn.addEventListener('click', () => {
+    const row = btn.closest('.data-row');
+    const del = row.dataset.deleted === '1';
+    row.dataset.deleted = del ? '' : '1';
+    row.style.opacity = del ? '' : '.4';
+    row.querySelector('.data-score').disabled = !del;
+    btn.textContent = del ? '✕' : '↺';
+  }));
+}
+async function saveDataEdits() {
+  const entries = [];
+  document.querySelectorAll('#data-list .data-row').forEach(r => {
+    if (r.dataset.deleted === '1') return;
+    let score = parseInt(r.querySelector('.data-score').value, 10);
+    if (Number.isNaN(score)) return;
+    score = Math.max(0, Math.min(10, score));
+    entries.push({ date: r.dataset.date, player: r.dataset.player, score });
+  });
+  await saveEntries(entries);
+  byDate = {};
+  for (const e of entries) (byDate[e.date] = byDate[e.date] || []).push(e);
+  if (entries.length) {
+    computeStats();
+    renderLeaderboard(false); renderTicker();
+    if (curView==='history') renderHistory();
+    if (curView==='seasons') renderSeasons();
+  } else {
+    allDays=[]; allStats=[]; curDayIdx=0;
+    document.getElementById('app').style.display='none';
+    document.getElementById('empty-state').style.display='flex';
+  }
+  renderDataSettings();
+  const msg = document.getElementById('data-saved-msg');
+  msg.style.display='block'; setTimeout(()=>{ msg.style.display='none'; }, 2000);
+}
+document.getElementById('save-data-btn').addEventListener('click', saveDataEdits);
+
 /* ── FILE HANDLING ─────────────────────────────────────────────────────── */
 const dropZone  = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
@@ -1201,15 +1308,8 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
   const saison = sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01';
   const lines = [];
 
-  // Days left in current season
-  let dl = null;
-  if (sk.length) {
-    const [sm, sy] = sk[sk.length - 1].split('/');
-    const today = new Date();
-    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const seasonEnd = new Date(parseInt(sy), parseInt(sm), 0);
-    dl = Math.round((seasonEnd - todayMid) / 86400000);
-  }
+  // Days left in current season (fin anticipée incluse)
+  const dl = seasonDaysLeft();
 
   const isFinalDay = dl !== null && dl <= 0;
 
@@ -1239,21 +1339,23 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
 
     // Classement complet
     lines.push('📊 Classement final :');
-    allStats.forEach((p, i) => {
-      const medal = medals[i] || `${i + 1}.`;
+    allStats.forEach((p) => {
+      const medal = (p.rank <= 3 ? medals[p.rank - 1] : `${p.rank}.`);
+      const tie = p.tied ? '= ' : '';
       const avgStr = p.played ? ` · moy. ${p.avg.toFixed(2)}` : '';
-      lines.push(`${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
+      lines.push(`${tie}${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
     });
     lines.push('');
 
-    // Stats de saison
-    const mostAssiduous = [...allStats].sort((a, b) => b.played - a.played)[0];
-    const bestAvg = [...allStats].filter(p => p.played > 0).sort((a, b) => b.avg - a.avg)[0];
-    const bestSingle = [...allStats].sort((a, b) => b.best - a.best)[0];
+    // Stats de saison (ex-æquo inclus)
+    const played = allStats.filter(p => p.played > 0);
+    const maxAvg = played.length ? Math.max(...played.map(p => p.avg)) : null;
+    const maxBest = allStats.length ? Math.max(...allStats.map(p => p.best)) : null;
+    const maxPlayed = allStats.length ? Math.max(...allStats.map(p => p.played)) : null;
     lines.push('🎯 Records de la saison :');
-    if (bestAvg) lines.push(`📈 Meilleure moyenne : ${dn(bestAvg.name)} (${bestAvg.avg.toFixed(2)}/10)`);
-    if (bestSingle) lines.push(`⚡ Meilleur score : ${dn(bestSingle.name)} (${bestSingle.best}/10)`);
-    if (mostAssiduous) lines.push(`🏅 Plus assidu·e : ${dn(mostAssiduous.name)} (${mostAssiduous.played}/${allDays.length} jours)`);
+    if (maxAvg !== null) lines.push(`📈 Meilleure moyenne : ${fmtRecordHolders(played.filter(p => p.avg === maxAvg).map(p => dn(p.name)))} (${maxAvg.toFixed(2)}/10)`);
+    if (maxBest !== null) lines.push(`⚡ Meilleur score : ${fmtRecordHolders(allStats.filter(p => p.best === maxBest).map(p => dn(p.name)))} (${maxBest}/10)`);
+    if (maxPlayed !== null) lines.push(`🏅 Plus assidu·e : ${fmtRecordHolders(allStats.filter(p => p.played === maxPlayed).map(p => dn(p.name)))} (${maxPlayed}/${allDays.length} jours)`);
     lines.push('');
     lines.push(`👉 ${location.origin + location.pathname}`);
 
@@ -1284,11 +1386,12 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
       }
     }
 
-    // Ranking recap (top 3)
+    // Ranking recap (top 3 ranks, including all ex-æquo at each rank)
     const medals = ['🥇','🥈','🥉'];
     lines.push('📊 Classement :');
-    allStats.slice(0, 3).forEach((p, i) => {
-      lines.push(`${medals[i]} ${dn(p.name)} — ${p.total} pts`);
+    allStats.filter(p => p.rank <= 3).forEach((p) => {
+      const tie = p.tied ? '= ' : '';
+      lines.push(`${tie}${medals[p.rank - 1]} ${dn(p.name)} — ${p.total} pts`);
     });
     lines.push('');
 
@@ -1343,20 +1446,22 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
   lines.push('');
 
   lines.push('📊 Classement final :');
-  allStats.forEach((p, i) => {
-    const medal = medals[i] || `${i + 1}.`;
+  allStats.forEach((p) => {
+    const medal = (p.rank <= 3 ? medals[p.rank - 1] : `${p.rank}.`);
+    const tie = p.tied ? '= ' : '';
     const avgStr = p.played ? ` · moy. ${p.avg.toFixed(2)}` : '';
-    lines.push(`${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
+    lines.push(`${tie}${medal} ${dn(p.name)} — ${p.total} pts${avgStr}`);
   });
   lines.push('');
 
-  const bestAvg = [...allStats].filter(p => p.played > 0).sort((a, b) => b.avg - a.avg)[0];
-  const bestSingle = [...allStats].sort((a, b) => b.best - a.best)[0];
-  const mostAssiduous = [...allStats].sort((a, b) => b.played - a.played)[0];
+  const played = allStats.filter(p => p.played > 0);
+  const maxAvg = played.length ? Math.max(...played.map(p => p.avg)) : null;
+  const maxBest = allStats.length ? Math.max(...allStats.map(p => p.best)) : null;
+  const maxPlayed = allStats.length ? Math.max(...allStats.map(p => p.played)) : null;
   lines.push('🎯 Records de la saison :');
-  if (bestAvg) lines.push(`📈 Meilleure moyenne : ${dn(bestAvg.name)} (${bestAvg.avg.toFixed(2)}/10)`);
-  if (bestSingle) lines.push(`⚡ Meilleur score : ${dn(bestSingle.name)} (${bestSingle.best}/10)`);
-  if (mostAssiduous) lines.push(`🏅 Plus assidu·e : ${dn(mostAssiduous.name)} (${mostAssiduous.played}/${allDays.length} jours)`);
+  if (maxAvg !== null) lines.push(`📈 Meilleure moyenne : ${fmtRecordHolders(played.filter(p => p.avg === maxAvg).map(p => dn(p.name)))} (${maxAvg.toFixed(2)}/10)`);
+  if (maxBest !== null) lines.push(`⚡ Meilleur score : ${fmtRecordHolders(allStats.filter(p => p.best === maxBest).map(p => dn(p.name)))} (${maxBest}/10)`);
+  if (maxPlayed !== null) lines.push(`🏅 Plus assidu·e : ${fmtRecordHolders(allStats.filter(p => p.played === maxPlayed).map(p => dn(p.name)))} (${maxPlayed}/${allDays.length} jours)`);
   lines.push('');
   lines.push(`👉 ${location.origin + location.pathname}`);
 
@@ -1373,9 +1478,9 @@ function lsSet(e)    { try{localStorage.setItem(SK,JSON.stringify(e))}catch(_){}
 function lsGet()     { try{return JSON.parse(localStorage.getItem(SK)||'[]')}catch(_){return []} }
 function lsMapSet(m) { try{localStorage.setItem(MK,JSON.stringify(m))}catch(_){} }
 function lsMapGet()  { try{return JSON.parse(localStorage.getItem(MK)||'{}')}catch(_){return {}} }
-async function saveEntries(e) { lsSet(e); try{await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(e)})}catch(_){} }
+async function saveEntries(e) { lsSet(e); try{await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(e)})}catch(_){} }
 async function loadEntries()  { try{const r=await fetch('/api/data');if(r.ok){const d=await r.json();if(Array.isArray(d)){lsSet(d);return d}}}catch(_){} return lsGet(); }
-async function saveNameMap(m) { lsMapSet(m); try{await fetch('/api/namemap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(m)})}catch(_){} }
+async function saveNameMap(m) { lsMapSet(m); try{await fetch('/api/namemap',{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(m)})}catch(_){} }
 async function loadNameMap()  { try{const r=await fetch('/api/namemap');if(r.ok){const d=await r.json();if(d&&typeof d==='object'&&!Array.isArray(d)){lsMapSet(d);return d}}}catch(_){} return lsMapGet(); }
 
 /* ── PARSER ────────────────────────────────────────────────────────────── */
@@ -1400,7 +1505,9 @@ function parseWhatsApp(text) {
     if(TABLE_RE.test(full)){
       const sm=full.match(QUIZ_RE); if(!sm){i=j;continue;}
       const dm=full.match(TABLE_DATE_RE);
-      let date=msg.date;
+      // Pas d'en-tête de date : on rattache via l'horodatage WhatsApp, en tenant
+      // compte du créneau midi→midi (avant 12h = quiz de la veille).
+      let date=quizDateFromTimestamp(msg.date, msg.time);
       if(dm){const mo=MONTHS_FR_MAP[dm[2].toLowerCase()];if(mo)date=String(dm[1]).padStart(2,'0')+'/'+mo+'/'+dm[3];}
       entries.push({date,player:msg.player.replace(/\s+/g,' ').trim(),score:parseInt(sm[1],10)});
     }
@@ -1458,6 +1565,22 @@ function showInfo(m) {const e=document.getElementById('info-msg'); e.textContent
 function hideMsg(){document.getElementById('error-msg').style.display='none';document.getElementById('info-msg').style.display='none';}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function dateToInt(s){const[d,m,y]=s.split('/');return parseInt(y+m+d,10);}
+// Le quiz du jour court de 12h00 à 12h00 le lendemain : avant midi, on est encore
+// sur le quiz de la veille. Renvoie minuit du « jour quiz » courant.
+function quizDayMidnight(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (now.getHours() < 12) d.setDate(d.getDate() - 1);
+  return d;
+}
+// Convertit un horodatage WhatsApp (DD/MM/YYYY + HH:MM) en jour de quiz (DD/MM/YYYY),
+// frontière à midi. Un résultat partagé avant 12h compte pour le quiz de la veille.
+function quizDateFromTimestamp(dateStr, timeStr) {
+  const [d, mo, y] = dateStr.split('/').map(Number);
+  const dt = new Date(y, mo - 1, d);
+  const hh = timeStr ? parseInt(timeStr.split(':')[0], 10) : 12;
+  if (hh < 12) dt.setDate(dt.getDate() - 1);
+  return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + '/' + dt.getFullYear();
+}
 
 /* ── INTRO ─────────────────────────────────────────────────────────────── */
 let introTimers=[];

@@ -2,3 +2,17 @@ _worker.js
 wrangler.jsonc
 .assetsignore
 .gitignore
+.git
+node_modules
+data
+screen
+package.json
+package-lock.json
+server.js
+SHORTCUT.md
+*.jpg
+*.jpeg
+*.mp4
+*.zip
+Capture*.png
+og-image.svg

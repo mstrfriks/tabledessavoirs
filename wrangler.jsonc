@@ -7,7 +7,9 @@
     "enabled": true
   },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
   },
   "kv_namespaces": [
     { "binding": "TDS_KV", "id": "a9f59a16db264a5f8ecd8965ce23b451" }
