@@ -1088,6 +1088,43 @@ function fmtRecordHolders(names) {
   return (names.length > 1 && names.length === allStats.length) ? 'Tout le monde' : names.join(' & ');
 }
 
+// Récit de titre pour le(s) champion(s) de la saison qui vient de finir :
+// doublé/dynastie, nouveau champion qui détrône, ou reconquête. '' si rien à raconter.
+function seasonWinnersOf(mk) {
+  return computeSeasonStats(mk).filter(s => s.rank === 1).map(s => s.name);
+}
+function champTitleLine(leaders) {
+  const seasons = getAvailableSeasons();
+  if (seasons.length < 2) return ''; // première saison : aucun palmarès à comparer
+  const winners = leaders.map(s => s.name);
+  const prevSk = seasons[seasons.length - 2];
+  const prevWinners = seasonWinnersOf(prevSk);
+  const who = leaders.map(s => dn(s.name)).join(' & ');
+
+  // Même vainqueur (ensemble identique) que la saison précédente → titre conservé
+  const sameAsPrev = winners.length === prevWinners.length
+    && winners.every(n => prevWinners.includes(n));
+  if (sameAsPrev) {
+    // Nombre de titres consécutifs jusqu'à la saison courante incluse
+    let streak = 0;
+    for (let i = seasons.length - 1; i >= 0; i--) {
+      if (winners.every(n => seasonWinnersOf(seasons[i]).includes(n))) streak++;
+      else break;
+    }
+    if (leaders.length > 1) return `🔁 ILS CONSERVENT LA COURONNE — ${who}, ${streak}ᵉ sacre d'affilée !`;
+    if (streak >= 3) return `🔥 DYNASTIE — ${who} règne pour la ${streak}ᵉ saison consécutive !`;
+    return `🔁 BACK-TO-BACK — ${who} conserve sa couronne !`;
+  }
+
+  // Nouveau(x) champion(s) : on cite le tenant détrôné
+  const dethroned = prevWinners.map(dn).join(' & ');
+  // Reconquête : a déjà été sacré lors d'une saison passée (autre que la précédente)
+  const reconquest = winners.some(n =>
+    seasons.slice(0, -1).some(sk => sk !== prevSk && seasonWinnersOf(sk).includes(n)));
+  if (reconquest) return `♛ RECONQUÊTE — ${who} reprend le trône à ${dethroned} !`;
+  return `🆕 NOUVEAU CHAMPION — ${who} détrône ${dethroned} !`;
+}
+
 function computeSeasonStats(mk) {
   const [m, y] = mk.split('/');
   const days = Object.keys(byDate).filter(d => { const [,dm,dy]=d.split('/'); return dm===m && dy===y; }).sort((a,b)=>dateToInt(a)-dateToInt(b));
@@ -1335,6 +1372,8 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
       lines.push(`👑 ${dn(champ.name)}`);
       lines.push(`   ${champ.total} pts · moy. ${champ.avg.toFixed(2)}/10 · ${champ.played}/${allDays.length} jours joués`);
     }
+    const titleLine = champTitleLine(leaders);
+    if (titleLine) lines.push(titleLine);
     lines.push('');
 
     // Classement complet
@@ -1443,6 +1482,8 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
     lines.push(`👑 ${dn(champ.name)}`);
     lines.push(`   ${champ.total} pts · moy. ${champ.avg.toFixed(2)}/10 · ${champ.played}/${allDays.length} jours joués`);
   }
+  const titleLine = champTitleLine(leaders);
+  if (titleLine) lines.push(titleLine);
   lines.push('');
 
   lines.push('📊 Classement final :');
