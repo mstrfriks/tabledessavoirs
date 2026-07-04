@@ -945,7 +945,7 @@ function renderLeaderboard(animate) {
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
       <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
       <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${medalBadges(p.medals)}</div><div class="ucb-row-sub">${sub}</div></div>
-      <div class="ucb-stat" style="text-align:right">${p.played}</div>
+      <div class="ucb-stat" style="text-align:right">${p.played}${allDays.length - p.played > 0 ? `<span style="color:var(--danger);font-size:.72em;font-weight:800" title="${allDays.length - p.played} jour${allDays.length - p.played > 1 ? 's' : ''} manqué${allDays.length - p.played > 1 ? 's' : ''}">&nbsp;−${allDays.length - p.played}</span>` : ''}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
       <div class="ucb-spark">${p.series.map(s => s==null
         ? `<div class="ucb-spark-bar miss"></div>`
@@ -1445,6 +1445,18 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
         const delta = prevRankOf[p.name] - p.rank;
         const arrow = delta > 0 ? `▲${delta}` : `▼${Math.abs(delta)}`;
         lines.push(`${arrow} ${dn(p.name)} (${p.rank === 1 ? '1ère' : p.rank + 'e'} place)`);
+      });
+      lines.push('');
+    }
+
+    // Players with missed games
+    const behind = allStats.filter(p => p.played < allDays.length)
+      .sort((a, b) => (b.played - a.played) || a.name.localeCompare(b.name, 'fr'));
+    if (behind.length) {
+      lines.push('⏰ Parties en retard :');
+      behind.forEach(p => {
+        const missed = allDays.length - p.played;
+        lines.push(`😴 ${dn(p.name)} — ${missed} partie${missed > 1 ? 's' : ''} en moins`);
       });
       lines.push('');
     }
