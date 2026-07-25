@@ -1,14 +1,14 @@
 // Une "ligue" isole un groupe d'amis dans son propre espace de données, sous
-// la même app/déploiement. La ligue "default" garde les clés KV historiques
-// (entries / nameMap) pour ne pas casser les données existantes ; toute autre
-// ligue est stockée sous des clés préfixées (entries:<ligue> / nameMap:<ligue>).
+// la même app/déploiement : entries:<ligue> / nameMap:<ligue>. Sans paramètre
+// ?league=, on retombe sur "_none_", une clé volontairement jamais peuplée —
+// l'URL nue ne doit exposer les données d'aucun groupe.
 function kvKey(base, league) {
-  return league === 'default' ? base : `${base}:${league}`;
+  return `${base}:${league}`;
 }
 
 function sanitizeLeague(raw) {
-  const v = (raw || 'default').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  return v || 'default';
+  const v = (raw || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return v || '_none_';
 }
 
 export default {

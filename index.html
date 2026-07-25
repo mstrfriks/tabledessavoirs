@@ -764,18 +764,20 @@ document.getElementById('ucb-mark').innerHTML = `<svg width="54" height="54" vie
 
 /* ── LIGUE ─────────────────────────────────────────────────────────────── */
 // Une ligue isole un groupe d'amis dans son propre classement, sur la même
-// page : https://.../?ligue=<nom>. Sans paramètre, on garde le groupe
-// historique ("default"). Ça change la clé de stockage KV côté worker et les
-// clés du cache local, pour que deux ligues ne se mélangent jamais.
-const LEAGUE = (new URLSearchParams(location.search).get('ligue') || 'default')
-  .toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
-const leagueQS = LEAGUE === 'default' ? '' : `?league=${encodeURIComponent(LEAGUE)}`;
-if (LEAGUE !== 'default') document.title += ' — ' + LEAGUE;
+// page : https://.../?ligue=<nom>. L'URL nue (sans paramètre) ne doit exposer
+// les données d'aucun groupe — elle retombe sur "_none_", une clé jamais
+// peuplée côté worker, donc toujours vide. Ça évite qu'en raccourcissant un
+// lien partagé, on tombe par hasard sur les données d'un autre groupe.
+const LEAGUE = (new URLSearchParams(location.search).get('ligue') || '')
+  .toLowerCase().replace(/[^a-z0-9_-]/g, '') || '_none_';
+const leagueQS = `?league=${encodeURIComponent(LEAGUE)}`;
+if (LEAGUE !== '_none_') document.title += ' — ' + LEAGUE;
 
 /* ── SAISON ────────────────────────────────────────────────────────────── */
 // Le cutoff du 15/05/2026 exclut les anciennes données de test du groupe
-// historique. Une nouvelle ligue n'a pas ce passif : pas de cutoff pour elle.
-const SEASON_START = LEAGUE === 'default' ? 20260515 : 0; // YYYYMMDD
+// historique ("grimoire"). Une nouvelle ligue n'a pas ce passif : pas de
+// cutoff pour elle.
+const SEASON_START = LEAGUE === 'grimoire' ? 20260515 : 0; // YYYYMMDD
 
 /* ── STATE ─────────────────────────────────────────────────────────────── */
 let byDate     = {};
@@ -1538,8 +1540,8 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
 });
 
 /* ── PERSISTENCE ───────────────────────────────────────────────────────── */
-const SK = LEAGUE === 'default' ? 'tds_v1' : `tds_v1_${LEAGUE}`;
-const MK = LEAGUE === 'default' ? 'tds_namemap_v1' : `tds_namemap_v1_${LEAGUE}`;
+const SK = `tds_v1_${LEAGUE}`;
+const MK = `tds_namemap_v1_${LEAGUE}`;
 function lsSet(e)    { try{localStorage.setItem(SK,JSON.stringify(e))}catch(_){} }
 function lsGet()     { try{return JSON.parse(localStorage.getItem(SK)||'[]')}catch(_){return []} }
 function lsMapSet(m) { try{localStorage.setItem(MK,JSON.stringify(m))}catch(_){} }
