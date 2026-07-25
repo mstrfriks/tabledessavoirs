@@ -782,6 +782,9 @@ const LEAGUE = (new URLSearchParams(location.search).get('ligue') || '')
   .toLowerCase().replace(/[^a-z0-9_-]/g, '') || '_none_';
 const leagueQS = `?league=${encodeURIComponent(LEAGUE)}`;
 if (LEAGUE !== '_none_') document.title += ' — ' + LEAGUE;
+// Lien à partager : doit toujours porter ?ligue=... sinon le destinataire
+// tombe sur l'écran "Lien incomplet" (cf. no-league-state).
+function shareUrl() { return `${location.origin}${location.pathname}?ligue=${encodeURIComponent(LEAGUE)}`; }
 
 /* ── SAISON ────────────────────────────────────────────────────────────── */
 // Le cutoff du 15/05/2026 exclut les anciennes données de test du groupe
@@ -1420,7 +1423,7 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
     if (maxBest !== null) lines.push(`⚡ Meilleur score : ${fmtRecordHolders(allStats.filter(p => p.best === maxBest).map(p => dn(p.name)))} (${maxBest}/10)`);
     if (maxPlayed !== null) lines.push(`🏅 Plus assidu·e : ${fmtRecordHolders(allStats.filter(p => p.played === maxPlayed).map(p => dn(p.name)))} (${maxPlayed}/${allDays.length} jours)`);
     lines.push('');
-    lines.push(`👉 ${location.origin + location.pathname}`);
+    lines.push(`👉 ${shareUrl()}`);
 
   } else {
     // ── MESSAGE EN COURS DE SAISON ───────────────────────────────────────
@@ -1485,7 +1488,7 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
       lines.push('');
     }
 
-    lines.push(`👉 ${location.origin + location.pathname}`);
+    lines.push(`👉 ${shareUrl()}`);
   }
 
   navigator.clipboard.writeText(lines.join('\n')).then(() => {
@@ -1540,7 +1543,7 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
   if (maxBest !== null) lines.push(`⚡ Meilleur score : ${fmtRecordHolders(allStats.filter(p => p.best === maxBest).map(p => dn(p.name)))} (${maxBest}/10)`);
   if (maxPlayed !== null) lines.push(`🏅 Plus assidu·e : ${fmtRecordHolders(allStats.filter(p => p.played === maxPlayed).map(p => dn(p.name)))} (${maxPlayed}/${allDays.length} jours)`);
   lines.push('');
-  lines.push(`👉 ${location.origin + location.pathname}`);
+  lines.push(`👉 ${shareUrl()}`);
 
   navigator.clipboard.writeText(lines.join('\n')).then(() => {
     const el = document.getElementById('copy-wa-final-msg');
