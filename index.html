@@ -969,10 +969,18 @@ function renderLeaderboard(animate) {
       : delta > 0 ? `<span class="ucb-rank-delta up">▲${delta}</span>`
       : delta < 0 ? `<span class="ucb-rank-delta dn">▼${Math.abs(delta)}</span>`
       : '<span class="ucb-rank-delta eq">—</span>';
+    // Le badge "parties manquées" vit dans ucb-row-sub (toujours visible) et pas
+    // dans la colonne PARTIES : sur mobile cette colonne est masquée par le CSS
+    // responsive (nth-child 3/4/5), ce qui rendait l'indicateur invisible là où
+    // le lien est le plus consulté (partagé via WhatsApp).
+    const missed = allDays.length - p.played;
+    const missedBadge = missed > 0
+      ? ` <span style="color:var(--danger);font-weight:800" title="${missed} jour${missed > 1 ? 's' : ''} manqué${missed > 1 ? 's' : ''}">−${missed}</span>`
+      : '';
     return `<div class="ucb-row ${p.rank===1?'r1':''}${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
       <div class="ucb-row-rank ${p.rank>3?'dim':''}">${p.tied?'<span style="font-size:.6em;vertical-align:middle;opacity:.7">=</span>':''}${String(p.rank).padStart(2,'0')}${deltaHtml}</div>
-      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${medalBadges(p.medals)}</div><div class="ucb-row-sub">${sub}</div></div>
-      <div class="ucb-stat" style="text-align:right">${p.played}${allDays.length - p.played > 0 ? `<span style="color:var(--danger);font-size:.72em;font-weight:800" title="${allDays.length - p.played} jour${allDays.length - p.played > 1 ? 's' : ''} manqué${allDays.length - p.played > 1 ? 's' : ''}">&nbsp;−${allDays.length - p.played}</span>` : ''}</div>
+      <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${medalBadges(p.medals)}</div><div class="ucb-row-sub">${sub}${missedBadge}</div></div>
+      <div class="ucb-stat" style="text-align:right">${p.played}</div>
       <div class="ucb-stat" style="text-align:right">${p.avg.toFixed(2)}</div>
       <div class="ucb-spark">${p.series.map(s => s==null
         ? `<div class="ucb-spark-bar miss"></div>`
