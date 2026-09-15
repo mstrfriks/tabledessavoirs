@@ -6,3 +6,18 @@ data/
 !.dev.vars.example
 .env*
 !.env.example
+
+# outil local NAS (upload WhatsApp via Tailscale) — hors périmètre du site déployé
+server.js
+package.json
+package-lock.json
+SHORTCUT.md
+screen/
+node_modules/
+
+# médias et captures personnels
+*.jpg
+*.jpeg
+*.mp4
+*.zip
+Capture*.png
