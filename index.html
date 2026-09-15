@@ -1330,18 +1330,26 @@ function renderDataSettings() {
   }));
 }
 async function saveDataEdits() {
+  // Les scores modifiés (manual) et les parties supprimées (deleted, gardées en
+  // "tombstone") priment sur les futures relectures WhatsApp dans buildRanking —
+  // sans ça, un ré-import (qui réexporte tout l'historique) écrase silencieusement
+  // une correction à la baisse ou fait réapparaître une partie supprimée.
   const entries = [];
   document.querySelectorAll('#data-list .data-row').forEach(r => {
-    if (r.dataset.deleted === '1') return;
+    if (r.dataset.deleted === '1') {
+      entries.push({ date: r.dataset.date, player: r.dataset.player, score: null, deleted: true });
+      return;
+    }
     let score = parseInt(r.querySelector('.data-score').value, 10);
     if (Number.isNaN(score)) return;
     score = Math.max(0, Math.min(10, score));
-    entries.push({ date: r.dataset.date, player: r.dataset.player, score });
+    entries.push({ date: r.dataset.date, player: r.dataset.player, score, manual: true });
   });
   await saveEntries(entries);
+  const live = entries.filter(e => !e.deleted);
   byDate = {};
-  for (const e of entries) (byDate[e.date] = byDate[e.date] || []).push(e);
-  if (entries.length) {
+  for (const e of live) (byDate[e.date] = byDate[e.date] || []).push(e);
+  if (live.length) {
     computeStats();
     renderLeaderboard(false); renderTicker();
     if (curView==='history') renderHistory();
@@ -1573,7 +1581,7 @@ function parseMsgStart(line) {
   return null;
 }
 const MONTHS_FR_MAP={'janvier':'01','février':'02','mars':'03','avril':'04','mai':'05','juin':'06','juillet':'07','août':'08','septembre':'09','octobre':'10','novembre':'11','décembre':'12'};
-const TABLE_DATE_RE=/La Table des Savoirs\s*-\s*(\d{1,2})\s+(\w+)\s+(\d{4})/i;
+const TABLE_DATE_RE=/La Table des Savoirs\s*-\s*(\d{1,2})\s+(\p{L}+)\s+(\d{4})/iu;
 const QUIZ_RE=/Quiz[^(]*\((\d+)\/10\)/i, TABLE_RE=/La Table des Savoirs/i;
 function parseWhatsApp(text) {
   const lines = text.replace(/^﻿/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n')
@@ -1602,15 +1610,28 @@ async function buildRanking(entries) {
   const best={};
   for(const e of entries){
     if(dateToInt(e.date)<SEASON_START) continue; // saison commence le 15/05/2026
-    const k=e.date+'||'+e.player;if(!best[k]||e.score>best[k].score)best[k]=e;
+    const k=e.date+'||'+e.player;
+    const cur=best[k];
+    if(!cur){ best[k]=e; continue; }
+    // Une correction manuelle (score édité ou partie supprimée) prime toujours
+    // sur une relecture WhatsApp fraîche — sinon un ré-import (qui réexporte
+    // souvent tout l'historique) écrase silencieusement la correction.
+    if(cur.manual||cur.deleted) continue;
+    if(e.manual||e.deleted){ best[k]=e; continue; }
+    if(e.score>cur.score) best[k]=e;
   }
   await saveEntries(Object.values(best));
   byDate={};
-  for(const e of Object.values(best)) (byDate[e.date]=byDate[e.date]||[]).push(e);
+  for(const e of Object.values(best)) if(!e.deleted) (byDate[e.date]=byDate[e.date]||[]).push(e);
   computeStats();
-  showApp();
-  renderLeaderboard(true);
-  renderTicker();
+  if (allStats.length) {
+    showApp();
+    renderLeaderboard(true);
+    renderTicker();
+  } else {
+    document.getElementById('app').style.display='none';
+    document.getElementById('empty-state').style.display='flex';
+  }
 }
 
 function processFile(file) {
