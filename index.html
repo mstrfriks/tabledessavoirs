@@ -287,12 +287,14 @@
     }
     .ucb-replay-btn:hover { background: rgba(245,220,0,.1); }
     .ucb-settings-btn {
+      position: relative;
       background: transparent; border: 1px solid var(--border-dim);
       color: var(--text-dim); width: 36px; height: 36px;
       font-size: 18px; cursor: pointer; display: flex;
       align-items: center; justify-content: center; flex-shrink: 0;
     }
     .ucb-settings-btn:hover { color: var(--text); border-color: var(--text-mid); }
+    .ucb-settings-badge { position: absolute; top: -6px; right: -6px; font-size: 12px; line-height: 1; }
     .ucb-live {
       display: flex; align-items: center; gap: 8px;
       font-size: 11px; letter-spacing: .35em; font-weight: 800;
@@ -671,8 +673,10 @@
         <div style="font-size:10px;letter-spacing:.3em;color:var(--text-dim);font-weight:800;text-transform:uppercase;margin-bottom:.6rem">📲 Partager sur WhatsApp</div>
         <button id="copy-wa-btn" class="save-btn">Copier le message classement</button>
         <button id="copy-wa-final-btn" class="save-btn" style="margin-top:.5rem;background:linear-gradient(135deg,#b8860b,#d4af37)">🏆 Copier le bilan de fin de saison</button>
+        <button id="image-wa-final-btn" class="save-btn" style="margin-top:.5rem;background:linear-gradient(135deg,#b8860b,#d4af37)">🖼 Image du bilan de fin de saison</button>
         <p id="copy-wa-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Message copié !</p>
         <p id="copy-wa-final-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Bilan copié !</p>
+        <p id="image-wa-final-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem"></p>
       </div>
       <div style="margin-top:1.2rem;padding-top:1.1rem;border-top:1px solid var(--border-dim)">
         <div style="font-size:10px;letter-spacing:.3em;color:var(--text-dim);font-weight:800;text-transform:uppercase;margin-bottom:.6rem">🙈 Suspense fin de saison</div>
@@ -726,7 +730,7 @@
       </div>
     </div>
     <div class="ucb-header-actions">
-<button class="ucb-settings-btn" id="settings-btn" title="Réglages">⚙</button>
+<button class="ucb-settings-btn" id="settings-btn" title="Réglages">⚙<span class="ucb-settings-badge" id="settings-hide-badge" style="display:none" title="Classement masqué">🙈</span></button>
     </div>
   </header>
 
@@ -812,6 +816,7 @@ let curView      = 'leaderboard';
 let curSeasonKey = null; // 'MM/YYYY'
 let authToken    = sessionStorage.getItem('tds_auth') || ''; // write secret (entered via PIN)
 let hideScoresOn = false; // suspense fin de saison — masque rang/total/moyenne, partagé via /api/settings
+let hideScoresSeasonKey = ''; // saison pour laquelle hideScoresOn a été activé — sert à l'auto-désactiver au changement de saison
 
 function dn(p) { return nameMap[p] || p; }
 
@@ -926,6 +931,8 @@ function renderLeaderboard(animate) {
       ? ` <span style="font-style:normal;font-size:.7em" title="Palmarès saisons — ${m.gold}🥇 ${m.silver}🥈 ${m.bronze}🥉">${parts.join(' ')}</span>`
       : '';
   };
+
+  document.getElementById('settings-hide-badge').style.display = hideScoresOn ? 'inline' : 'none';
 
   document.getElementById('standings-head').innerHTML = hideScoresOn
     ? `<div style="text-align:center">🙈</div><div>JOUEUR</div><div style="text-align:right">PARTIES</div><div style="text-align:right">—</div><div>FORME</div><div style="text-align:center">—</div>`
@@ -1439,11 +1446,24 @@ fileInput.addEventListener('change', e => { if(e.target.files[0]) processFile(e.
 document.getElementById('clear-btn').addEventListener('click', clearData);
 document.getElementById('hide-scores-toggle').addEventListener('change', async e => {
   hideScoresOn = e.target.checked;
-  await saveHideScores(hideScoresOn);
+  const sk = getAvailableSeasons();
+  await saveHideScores(hideScoresOn, sk.length ? sk[sk.length - 1] : '');
   const msg = document.getElementById('hide-scores-msg');
   msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2000);
   if (allStats.length) { renderLeaderboard(false); renderTicker(); }
 });
+
+// Le bilan de fin de saison révèle le classement complet : envoyer ce bilan
+// vaut donc confirmation que le suspense peut être levé pour tout le monde.
+function revealScoresIfHidden() {
+  if (!hideScoresOn) return;
+  hideScoresOn = false;
+  const sk = getAvailableSeasons();
+  saveHideScores(false, sk.length ? sk[sk.length - 1] : '');
+  const toggle = document.getElementById('hide-scores-toggle');
+  if (toggle) toggle.checked = false;
+  if (allStats.length) { renderLeaderboard(false); renderTicker(); }
+}
 
 // Bilan de fin de saison — partagé par le message "classement" (quand la saison
 // vient de se terminer) et par le bouton dédié "Copier le bilan de fin de saison".
@@ -1506,6 +1526,7 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
   let lines;
   if (isFinalDay) {
     // ── MESSAGE DE FIN DE SAISON ─────────────────────────────────────────
+    revealScoresIfHidden();
     lines = buildSeasonRecapLines(saison);
   } else {
     // ── MESSAGE EN COURS DE SAISON ───────────────────────────────────────
@@ -1583,6 +1604,7 @@ document.getElementById('copy-wa-btn').addEventListener('click', () => {
 
 document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
   if (!allStats.length) return;
+  revealScoresIfHidden();
   const sk = getAvailableSeasons();
   const saison = sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01';
   const lines = buildSeasonRecapLines(saison);
@@ -1594,6 +1616,111 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
   });
 });
 
+// Même bilan que buildSeasonRecapLines, mis en image — plus lisible et plus
+// "fêtard" à coller dans le groupe WhatsApp qu'un pavé de texte.
+async function buildSeasonRecapImage(saison) {
+  if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch(_){} }
+
+  const champ = allStats[0];
+  const leaders = allStats.filter(s => s.rank === 1);
+  const isExAequo = leaders.length > 1;
+  const titleLine = champTitleLine(leaders);
+  const played = allStats.filter(p => p.played > 0);
+  const maxAvg = played.length ? Math.max(...played.map(p => p.avg)) : null;
+  const maxBest = allStats.length ? Math.max(...allStats.map(p => p.best)) : null;
+  const maxPlayed = allStats.length ? Math.max(...allStats.map(p => p.played)) : null;
+  const records = [];
+  if (maxAvg !== null) records.push(['📈', `Meilleure moyenne — ${fmtRecordHolders(played.filter(p => p.avg === maxAvg).map(p => dn(p.name)))}`, `${maxAvg.toFixed(2)}/10`]);
+  if (maxBest !== null) records.push(['⚡', `Meilleur score — ${fmtRecordHolders(allStats.filter(p => p.best === maxBest).map(p => dn(p.name)))}`, `${maxBest}/10`]);
+  if (maxPlayed !== null) records.push(['🏅', `Plus assidu·e — ${fmtRecordHolders(allStats.filter(p => p.played === maxPlayed).map(p => dn(p.name)))}`, `${maxPlayed}/${allDays.length} jours`]);
+
+  const W = 900, padX = 56, rowH = 56;
+  const BG = '#05080f', BORDER = '#2c3a5e', TEXT = '#f4f1e8', TEXT_MID = '#a0a8c0', TEXT_DIM = '#6a7390', ACCENT = '#f5dc00', DANGER = '#ff3344';
+  const F = (w, s) => `${w} ${s}px "Barlow Condensed"`;
+  const ops = [];
+  let y = 64;
+  const push = (text, font, color, opt = {}) => ops.push({ text, font, color, x: opt.x ?? padX, y, align: opt.align || 'left' });
+
+  push(`🏆 UCB · ${saison.toUpperCase()} · RÉSULTATS FINAUX`, F(900, 30), ACCENT);
+  y += 26; ops.push({ line: true, y }); y += 54;
+
+  push(isExAequo ? 'EX-ÆQUO AU SOMMET' : 'CHAMPION DE LA SAISON', F(800, 16), TEXT_DIM);
+  y += 46;
+  push(leaders.map(s => '👑 ' + dn(s.name)).join('   &   '), F(900, 42), ACCENT);
+  y += 34;
+  push(isExAequo
+    ? `${champ.total} points · ${allDays.length} journées`
+    : `${champ.total} pts · moy. ${champ.avg.toFixed(2)}/10 · ${champ.played}/${allDays.length} jours joués`, F(700, 18), TEXT_MID);
+  if (titleLine) { y += 32; push(titleLine, F(800, 16), DANGER); }
+
+  y += 46;
+  push('CLASSEMENT FINAL', F(800, 15), TEXT_DIM);
+  y += 16; ops.push({ line: true, y }); y += 40;
+
+  const medals = ['🥇', '🥈', '🥉'];
+  allStats.forEach((p, i) => {
+    if (i % 2 === 1) ops.push({ stripe: true, y: y - 38, h: rowH, x: padX - 16, w: W - 2 * (padX - 16) });
+    const medalOrRank = p.rank <= 3 ? medals[p.rank - 1] : (p.rank + '.');
+    push(medalOrRank, F(900, 22), p.rank <= 3 ? ACCENT : TEXT_DIM);
+    push((p.tied ? '= ' : '') + dn(p.name), F(800, 22), TEXT, { x: padX + 64 });
+    push(`${p.total} pts · moy. ${p.avg.toFixed(2)}`, F(700, 17), TEXT_MID, { x: W - padX, align: 'right' });
+    y += rowH;
+  });
+
+  y += 10;
+  push('RECORDS DE LA SAISON', F(800, 15), TEXT_DIM);
+  y += 40;
+  records.forEach(([emoji, label, value]) => {
+    push(`${emoji} ${label}`, F(700, 17), TEXT_MID);
+    push(value, F(800, 17), TEXT, { x: W - padX, align: 'right' });
+    y += 32;
+  });
+
+  y += 28; ops.push({ line: true, y }); y += 40;
+  push(shareUrl(), F(700, 14), TEXT_DIM);
+  y += 40;
+
+  const DPR = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * DPR; canvas.height = y * DPR;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, y);
+  ctx.textBaseline = 'alphabetic';
+  ops.forEach(op => {
+    if (op.line)   { ctx.strokeStyle = BORDER; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(padX, op.y); ctx.lineTo(W - padX, op.y); ctx.stroke(); return; }
+    if (op.stripe) { ctx.fillStyle = 'rgba(255,255,255,.03)'; ctx.fillRect(op.x, op.y, op.w, op.h); return; }
+    ctx.font = op.font; ctx.fillStyle = op.color; ctx.textAlign = op.align;
+    ctx.fillText(op.text, op.x, op.y);
+  });
+  return canvas;
+}
+
+document.getElementById('image-wa-final-btn').addEventListener('click', async () => {
+  if (!allStats.length) return;
+  revealScoresIfHidden();
+  const sk = getAvailableSeasons();
+  const saison = sk.length ? seasonLabel(sk[sk.length-1]) : 'Saison 01';
+  const canvas = await buildSeasonRecapImage(saison);
+  canvas.toBlob(async blob => {
+    if (!blob) return;
+    const msg = document.getElementById('image-wa-final-msg');
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      msg.textContent = '✓ Image copiée !';
+    } catch (_) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `ucb-bilan-${saison.replace(/\s+/g,'-').toLowerCase()}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      msg.textContent = '✓ Image téléchargée !';
+    }
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  }, 'image/png');
+});
+
 /* ── PERSISTENCE ───────────────────────────────────────────────────────── */
 const SK = `tds_v1_${LEAGUE}`;
 const MK = `tds_namemap_v1_${LEAGUE}`;
@@ -1602,14 +1729,33 @@ function lsSet(e)    { try{localStorage.setItem(SK,JSON.stringify(e))}catch(_){}
 function lsGet()     { try{return JSON.parse(localStorage.getItem(SK)||'[]')}catch(_){return []} }
 function lsMapSet(m) { try{localStorage.setItem(MK,JSON.stringify(m))}catch(_){} }
 function lsMapGet()  { try{return JSON.parse(localStorage.getItem(MK)||'{}')}catch(_){return {}} }
-function lsHideSet(v) { try{localStorage.setItem(HK,JSON.stringify(!!v))}catch(_){} }
-function lsHideGet()  { try{return JSON.parse(localStorage.getItem(HK)||'false')}catch(_){return false} }
+function lsHideSet(v, sk) { try{localStorage.setItem(HK,JSON.stringify({hideScores:!!v,seasonKey:sk||''}))}catch(_){} }
+function lsHideGet()  { try{const d=JSON.parse(localStorage.getItem(HK)||'null'); return (d&&typeof d==='object')?d:{hideScores:false,seasonKey:''}}catch(_){return {hideScores:false,seasonKey:''}} }
 async function saveEntries(e) { lsSet(e); try{await fetch('/api/data'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(e)})}catch(_){} }
 async function loadEntries()  { try{const r=await fetch('/api/data'+leagueQS);if(r.ok){const d=await r.json();if(Array.isArray(d)){lsSet(d);return d}}}catch(_){} return lsGet(); }
 async function saveNameMap(m) { lsMapSet(m); try{await fetch('/api/namemap'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(m)})}catch(_){} }
 async function loadNameMap()  { try{const r=await fetch('/api/namemap'+leagueQS);if(r.ok){const d=await r.json();if(d&&typeof d==='object'&&!Array.isArray(d)){lsMapSet(d);return d}}}catch(_){} return lsMapGet(); }
-async function saveHideScores(v) { lsHideSet(v); try{await fetch('/api/settings'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify({hideScores:v})})}catch(_){} }
-async function loadHideScores()  { try{const r=await fetch('/api/settings'+leagueQS);if(r.ok){const d=await r.json();if(d&&typeof d.hideScores==='boolean'){lsHideSet(d.hideScores);return d.hideScores}}}catch(_){} return lsHideGet(); }
+async function saveHideScores(v, seasonKey) {
+  hideScoresSeasonKey = seasonKey || '';
+  lsHideSet(v, hideScoresSeasonKey);
+  try{await fetch('/api/settings'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify({hideScores:v,seasonKey:hideScoresSeasonKey})})}catch(_){}
+}
+async function loadHideScores() {
+  try{
+    const r=await fetch('/api/settings'+leagueQS);
+    if(r.ok){
+      const d=await r.json();
+      if(d&&typeof d.hideScores==='boolean'){
+        hideScoresSeasonKey = typeof d.seasonKey==='string' ? d.seasonKey : '';
+        lsHideSet(d.hideScores, hideScoresSeasonKey);
+        return d.hideScores;
+      }
+    }
+  }catch(_){}
+  const local = lsHideGet();
+  hideScoresSeasonKey = local.seasonKey;
+  return local.hideScores;
+}
 
 /* ── PARSER ────────────────────────────────────────────────────────────── */
 function parseMsgStart(line) {
@@ -1663,6 +1809,14 @@ async function buildRanking(entries) {
   byDate={};
   for(const e of Object.values(best)) if(!e.deleted) (byDate[e.date]=byDate[e.date]||[]).push(e);
   computeStats();
+  // Auto-désactive le suspense fin de saison dès qu'une nouvelle saison démarre,
+  // pour ne pas masquer le classement de la saison suivante par oubli.
+  const seasons = getAvailableSeasons();
+  const latestSk = seasons.length ? seasons[seasons.length-1] : '';
+  if (hideScoresOn && hideScoresSeasonKey && latestSk && hideScoresSeasonKey !== latestSk) {
+    hideScoresOn = false;
+    saveHideScores(false, latestSk);
+  }
   if (allStats.length) {
     showApp();
     renderLeaderboard(true);
