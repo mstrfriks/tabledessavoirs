@@ -63,6 +63,22 @@ export default {
       }
     }
 
+    if (url.pathname === '/api/settings') {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+      if (!env.TDS_KV) return Response.json({ error: 'KV namespace not bound' }, { status: 503 });
+      if (request.method === 'GET') {
+        const data = await env.TDS_KV.get(kvKey('settings', league), { type: 'json' });
+        return Response.json(data || { hideScores: false });
+      }
+      if (request.method === 'POST') {
+        if (!authed) return Response.json({ error: 'unauthorized' }, { status: 401 });
+        const body = await request.json();
+        const hideScores = !!(body && body.hideScores);
+        await env.TDS_KV.put(kvKey('settings', league), JSON.stringify({ hideScores }));
+        return Response.json({ ok: true, hideScores });
+      }
+    }
+
     // Everything else → serve static assets (index.html, etc.)
     return env.ASSETS.fetch(request);
   },

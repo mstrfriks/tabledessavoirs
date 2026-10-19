@@ -674,6 +674,14 @@
         <p id="copy-wa-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Message copié !</p>
         <p id="copy-wa-final-msg" style="display:none;color:var(--accent);font-size:.85rem;text-align:center;margin-top:.5rem">✓ Bilan copié !</p>
       </div>
+      <div style="margin-top:1.2rem;padding-top:1.1rem;border-top:1px solid var(--border-dim)">
+        <div style="font-size:10px;letter-spacing:.3em;color:var(--text-dim);font-weight:800;text-transform:uppercase;margin-bottom:.6rem">🙈 Suspense fin de saison</div>
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.85rem;color:var(--text)">
+          <input type="checkbox" id="hide-scores-toggle" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">
+          Masquer le classement (rangs, totaux, moyennes) pour tout le monde
+        </label>
+        <p id="hide-scores-msg" style="display:none;color:var(--accent);font-size:.85rem;margin-top:.5rem">✓ Préférence enregistrée</p>
+      </div>
       <div style="margin-top:1rem">
         <button id="clear-btn">✕ Effacer toutes les données</button>
       </div>
@@ -735,7 +743,7 @@
       <span class="ucb-section-badge" id="player-count-badge"></span>
     </div>
     <div class="ucb-rows">
-      <div class="ucb-row-head">
+      <div class="ucb-row-head" id="standings-head">
         <div style="text-align:center">RANG</div>
         <div>JOUEUR</div>
         <div style="text-align:right">PARTIES</div>
@@ -803,6 +811,7 @@ let curDayIdx  = 0;
 let curView      = 'leaderboard';
 let curSeasonKey = null; // 'MM/YYYY'
 let authToken    = sessionStorage.getItem('tds_auth') || ''; // write secret (entered via PIN)
+let hideScoresOn = false; // suspense fin de saison — masque rang/total/moyenne, partagé via /api/settings
 
 function dn(p) { return nameMap[p] || p; }
 
@@ -910,6 +919,50 @@ function renderLeaderboard(animate) {
 
   const champPct = rival ? champ.total / (champ.total + rival.total) * 100 : 100;
   const gap = rival ? champ.total - rival.total : 0;
+  const medalBadges = m => {
+    const parts = [['🥇',m.gold],['🥈',m.silver],['🥉',m.bronze]].filter(([,n]) => n > 0)
+      .map(([e,n]) => `${e}${n > 1 ? '×' + n : ''}`);
+    return parts.length
+      ? ` <span style="font-style:normal;font-size:.7em" title="Palmarès saisons — ${m.gold}🥇 ${m.silver}🥈 ${m.bronze}🥉">${parts.join(' ')}</span>`
+      : '';
+  };
+
+  document.getElementById('standings-head').innerHTML = hideScoresOn
+    ? `<div style="text-align:center">🙈</div><div>JOUEUR</div><div style="text-align:right">PARTIES</div><div style="text-align:right">—</div><div>FORME</div><div style="text-align:center">—</div>`
+    : `<div style="text-align:center">RANG</div><div>JOUEUR</div><div style="text-align:right">PARTIES</div><div style="text-align:right">MOY.</div><div>FORME</div><div style="text-align:center">TOTAL</div>`;
+
+  if (hideScoresOn) {
+    document.getElementById('ucb-hero').innerHTML =
+      `<div class="ucb-hero-left">
+        <div class="ucb-hero-eyebrow">${eyebrow}</div>
+        <div class="ucb-champ-name">🙈 Classement masqué</div>
+        <div class="ucb-champ-tag">${tag}</div>
+        <div class="ucb-champ-stats">
+          <div><div class="ucb-stat-label">Journées</div><div class="ucb-stat-value acc">${allDays.length}</div></div>
+          <div><div class="ucb-stat-label">Joueurs</div><div class="ucb-stat-value">${allStats.length}</div></div>
+        </div>
+      </div>`;
+
+    document.getElementById('player-count-badge').textContent = `${allStats.length} JOUEURS`;
+
+    const sorted = [...allStats].sort((a, b) => dn(a.name).localeCompare(dn(b.name), 'fr'));
+    document.getElementById('standings-rows').innerHTML = sorted.map((p, i) => {
+      const missed = allDays.length - p.played;
+      const missedBadge = missed > 0
+        ? ` <span style="color:var(--danger);font-weight:800" title="${missed} jour${missed > 1 ? 's' : ''} manqué${missed > 1 ? 's' : ''}">−${missed}</span>`
+        : '';
+      return `<div class="ucb-row${animate?' anim':''}" ${animate?`style="animation-delay:${i*.06}s"`:''}>
+        <div class="ucb-row-rank dim">🙈</div>
+        <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}${p.isDefendingChamp?` <span style="font-style:normal;font-size:.75em" title="Champion saison précédente">👑</span>`:''}${medalBadges(p.medals)}</div><div class="ucb-row-sub">Scores masqués${missedBadge}</div></div>
+        <div class="ucb-stat" style="text-align:right">${p.played}</div>
+        <div class="ucb-stat" style="text-align:right">—</div>
+        <div class="ucb-spark"><span style="opacity:.5;font-size:.75em">masqué</span></div>
+        <div class="ucb-total">—</div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
   document.getElementById('ucb-hero').innerHTML =
     `<div class="ucb-hero-left">
       <div class="ucb-hero-eyebrow">${eyebrow}</div>
@@ -952,13 +1005,6 @@ function renderLeaderboard(animate) {
   const SUBS = ['★ Leader','◆ Challenger','◇ Outsider'];
   const MID_SUBS = ['· Prétendant','· En embuscade','· Tapi dans l\'ombre','· Dans la mêlée','· À l\'affût','· En campagne'];
   const NEG_SUBS = ['· Lanterne rouge','· En perdition','· À la traîne'];
-  const medalBadges = m => {
-    const parts = [['🥇',m.gold],['🥈',m.silver],['🥉',m.bronze]].filter(([,n]) => n > 0)
-      .map(([e,n]) => `${e}${n > 1 ? '×' + n : ''}`);
-    return parts.length
-      ? ` <span style="font-style:normal;font-size:.7em" title="Palmarès saisons — ${m.gold}🥇 ${m.silver}🥈 ${m.bronze}🥉">${parts.join(' ')}</span>`
-      : '';
-  };
   document.getElementById('standings-rows').innerHTML = allStats.map((p, i) => {
     const fromLast = allStats.length - 1 - i;
     const sub = p.rank <= 3 ? SUBS[p.rank - 1]
@@ -1072,16 +1118,23 @@ function flashAndRender() {
 /* ── TICKER ────────────────────────────────────────────────────────────── */
 function renderTicker() {
   if (!allStats.length || !allDays.length) return;
-  const byAvg  = [...allStats].sort((a,b) => b.avg - a.avg);
-  const last   = allDays[allDays.length-1];
-  const rival  = allStats[1];
-  const items  = [
-    `★ ${dn(allStats[0].name).toUpperCase()} EN TÊTE AVEC ${allStats[0].total} POINTS`,
-    rival ? `★ ÉCART CHAMPION/CHALLENGER · ${allStats[0].total - rival.total} PTS` : null,
-    `★ MEILLEURE MOYENNE · ${dn(byAvg[0].name).toUpperCase()} (${byAvg[0].avg.toFixed(2)})`,
+  const last = allDays[allDays.length-1];
+  const items = hideScoresOn ? [
+    `🙈 CLASSEMENT MASQUÉ JUSQU'À LA FIN DE SAISON`,
     `★ DERNIÈRE JOURNÉE · ${last}`,
     `★ ${allDays.length} JOURNÉES JOUÉES`,
-  ].filter(Boolean);
+    `★ ${allStats.length} JOUEURS EN LICE`,
+  ] : (() => {
+    const byAvg = [...allStats].sort((a,b) => b.avg - a.avg);
+    const rival = allStats[1];
+    return [
+      `★ ${dn(allStats[0].name).toUpperCase()} EN TÊTE AVEC ${allStats[0].total} POINTS`,
+      rival ? `★ ÉCART CHAMPION/CHALLENGER · ${allStats[0].total - rival.total} PTS` : null,
+      `★ MEILLEURE MOYENNE · ${dn(byAvg[0].name).toUpperCase()} (${byAvg[0].avg.toFixed(2)})`,
+      `★ DERNIÈRE JOURNÉE · ${last}`,
+      `★ ${allDays.length} JOURNÉES JOUÉES`,
+    ].filter(Boolean);
+  })();
   const html = [...items, ...items].map(t => `<span><span class="acc">●</span> ${esc(t)}</span>`).join('');
   document.getElementById('ticker-track').innerHTML = html;
 }
@@ -1265,6 +1318,7 @@ function openSettings(tab) {
   document.querySelectorAll('.stab-btn').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
   document.querySelectorAll('.stab-pane').forEach(p => p.classList.toggle('active', p.id === 'stab-' + tab));
   if (tab === 'players') renderPlayersSettings();
+  document.getElementById('hide-scores-toggle').checked = hideScoresOn;
   document.getElementById('settings-overlay').classList.add('open');
 }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); hideMsg(); }
@@ -1383,6 +1437,13 @@ dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.
 dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', e => { if(e.target.files[0]) processFile(e.target.files[0]); });
 document.getElementById('clear-btn').addEventListener('click', clearData);
+document.getElementById('hide-scores-toggle').addEventListener('change', async e => {
+  hideScoresOn = e.target.checked;
+  await saveHideScores(hideScoresOn);
+  const msg = document.getElementById('hide-scores-msg');
+  msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2000);
+  if (allStats.length) { renderLeaderboard(false); renderTicker(); }
+});
 
 // Bilan de fin de saison — partagé par le message "classement" (quand la saison
 // vient de se terminer) et par le bouton dédié "Copier le bilan de fin de saison".
@@ -1536,14 +1597,19 @@ document.getElementById('copy-wa-final-btn').addEventListener('click', () => {
 /* ── PERSISTENCE ───────────────────────────────────────────────────────── */
 const SK = `tds_v1_${LEAGUE}`;
 const MK = `tds_namemap_v1_${LEAGUE}`;
+const HK = `tds_hidescores_v1_${LEAGUE}`;
 function lsSet(e)    { try{localStorage.setItem(SK,JSON.stringify(e))}catch(_){} }
 function lsGet()     { try{return JSON.parse(localStorage.getItem(SK)||'[]')}catch(_){return []} }
 function lsMapSet(m) { try{localStorage.setItem(MK,JSON.stringify(m))}catch(_){} }
 function lsMapGet()  { try{return JSON.parse(localStorage.getItem(MK)||'{}')}catch(_){return {}} }
+function lsHideSet(v) { try{localStorage.setItem(HK,JSON.stringify(!!v))}catch(_){} }
+function lsHideGet()  { try{return JSON.parse(localStorage.getItem(HK)||'false')}catch(_){return false} }
 async function saveEntries(e) { lsSet(e); try{await fetch('/api/data'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(e)})}catch(_){} }
 async function loadEntries()  { try{const r=await fetch('/api/data'+leagueQS);if(r.ok){const d=await r.json();if(Array.isArray(d)){lsSet(d);return d}}}catch(_){} return lsGet(); }
 async function saveNameMap(m) { lsMapSet(m); try{await fetch('/api/namemap'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify(m)})}catch(_){} }
 async function loadNameMap()  { try{const r=await fetch('/api/namemap'+leagueQS);if(r.ok){const d=await r.json();if(d&&typeof d==='object'&&!Array.isArray(d)){lsMapSet(d);return d}}}catch(_){} return lsMapGet(); }
+async function saveHideScores(v) { lsHideSet(v); try{await fetch('/api/settings'+leagueQS,{method:'POST',headers:{'Content-Type':'application/json','X-Auth-Token':authToken},body:JSON.stringify({hideScores:v})})}catch(_){} }
+async function loadHideScores()  { try{const r=await fetch('/api/settings'+leagueQS);if(r.ok){const d=await r.json();if(d&&typeof d.hideScores==='boolean'){lsHideSet(d.hideScores);return d.hideScores}}}catch(_){} return lsHideGet(); }
 
 /* ── PARSER ────────────────────────────────────────────────────────────── */
 function parseMsgStart(line) {
@@ -1689,7 +1755,9 @@ function playIntro(champ) {
   introTimers.push(setTimeout(()=>{
     logo.classList.remove('p1'); logo.classList.add('p2');
     tag.classList.remove('show');
-    ce.innerHTML=`<div class="intro-champ-eyebrow">★ LEADER</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS</div>`;
+    ce.innerHTML = hideScoresOn
+      ? `<div class="intro-champ-eyebrow">🙈 SUSPENSE</div><div class="intro-champ-name">Scores masqués</div>`
+      : `<div class="intro-champ-eyebrow">★ LEADER</div><div class="intro-champ-name">${esc(dn(champ.name))}</div><div class="intro-champ-pts">${champ.total} PTS</div>`;
     ce.classList.add('show');
   }, 2100));
   introTimers.push(setTimeout(()=>{ ov.classList.add('fade-out'); }, 4000));
@@ -1708,8 +1776,9 @@ function playIntro(champ) {
     document.getElementById('no-league-state').style.display='flex';
     return;
   }
-  const [stored, map] = await Promise.all([loadEntries(), loadNameMap()]);
+  const [stored, map, hide] = await Promise.all([loadEntries(), loadNameMap(), loadHideScores()]);
   nameMap = map;
+  hideScoresOn = hide;
   if (stored.length) {
     await buildRanking(stored);
     if (allStats.length) playIntro(allStats[0]);
