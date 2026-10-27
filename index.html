@@ -244,6 +244,21 @@
       color: var(--accent); letter-spacing: .05em; text-transform: uppercase;
     }
     #empty-state p, #no-league-state p { color: var(--text-dim); max-width: 360px; font-size: 1.1rem; letter-spacing: .04em; }
+    #suspense-block {
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 70vh; gap: 1rem;
+      text-align: center; padding: 2rem;
+    }
+    #suspense-block .ucb-suspense-emoji { font-size: 7rem; line-height: 1; filter: drop-shadow(0 0 40px rgba(245,220,0,.35)); }
+    #suspense-block h2 {
+      font-weight: 900; font-size: 2.2rem; font-style: italic;
+      color: var(--accent); letter-spacing: .05em; text-transform: uppercase;
+    }
+    #suspense-block p { color: var(--text-dim); max-width: 380px; font-size: 1.05rem; letter-spacing: .04em; }
+    #app.suspense-locked .ucb-tabs,
+    #app.suspense-locked .view,
+    #app.suspense-locked .ucb-ticker { display: none; }
+    #app.suspense-locked #suspense-block { display: flex; }
     #no-league-state code {
       color: var(--accent-light); background: rgba(245,220,0,.08);
       padding: .1rem .4rem; border-radius: 3px; font-size: .95em;
@@ -778,6 +793,12 @@
     <div class="ucb-ticker-track" id="ticker-track"></div>
   </div>
 
+  <div id="suspense-block">
+    <div class="ucb-suspense-emoji">🙈</div>
+    <h2>Suspense activé</h2>
+    <p>Le classement est masqué jusqu'à la fin de la saison. Revenez après l'annonce du champion !</p>
+  </div>
+
 </div><!-- #app -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -873,7 +894,12 @@ function computeStats() {
 }
 
 /* ── LEADERBOARD ───────────────────────────────────────────────────────── */
+function applySuspenseBlock() {
+  document.getElementById('app').classList.toggle('suspense-locked', hideScoresOn);
+}
+
 function renderLeaderboard(animate) {
+  applySuspenseBlock();
   if (!allStats.length) return;
   const champ = allStats[0];
   const leaders = allStats.filter(s => s.rank === 1);
@@ -1257,6 +1283,39 @@ function renderSeasons() {
   const champ = stats[0];
   if (!champ) { document.getElementById('season-content').innerHTML='<p style="color:var(--text-dim);padding:20px">Aucune donnée pour cette saison.</p>'; return; }
 
+  const seasonHidden = hideScoresOn && curSeasonKey === seasons[seasons.length-1];
+  if (seasonHidden) {
+    document.getElementById('season-content').innerHTML = `
+      <div class="ucb-season-hero">
+        <div class="ucb-season-hero-left">
+          <div class="ucb-season-eyebrow">${esc(label.toUpperCase())} · ${champ.days} JOURNÉES</div>
+          <div class="ucb-season-champ">🙈 Classement masqué</div>
+          <div class="ucb-season-tag">Suspense en cours</div>
+          <div class="ucb-season-stats">
+            <div><div class="ucb-stat-label">Journées</div><div class="ucb-stat-value acc">${champ.days}</div></div>
+            <div><div class="ucb-stat-label">Joueurs</div><div class="ucb-stat-value">${stats.length}</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="ucb-section-head"><span>// Classement · ${esc(label)}</span><span class="ucb-section-badge">${stats.length} JOUEURS</span></div>
+      <div class="ucb-rows">
+        <div class="ucb-row-head">
+          <div style="text-align:center">🙈</div><div>JOUEUR</div>
+          <div style="text-align:right">PARTIES</div><div style="text-align:right">—</div>
+          <div>FORME</div><div style="text-align:center">—</div>
+        </div>
+        ${[...stats].sort((a,b)=>dn(a.name).localeCompare(dn(b.name),'fr')).map(p => `<div class="ucb-row">
+          <div class="ucb-row-rank dim">🙈</div>
+          <div class="ucb-row-name-block"><div class="ucb-row-name">${esc(dn(p.name))}</div><div class="ucb-row-sub">Scores masqués</div></div>
+          <div class="ucb-stat" style="text-align:right">${p.played}</div>
+          <div class="ucb-stat" style="text-align:right">—</div>
+          <div class="ucb-spark"><span style="opacity:.5;font-size:.75em">masqué</span></div>
+          <div class="ucb-total">—</div>
+        </div>`).join('')}
+      </div>`;
+    return;
+  }
+
   const sLeaders = stats.filter(s => s.rank === 1);
   const sIsExAequo = sLeaders.length > 1;
   const sLeadersNames = sLeaders.map(s => esc(dn(s.name))).join(' · ');
@@ -1450,7 +1509,9 @@ document.getElementById('hide-scores-toggle').addEventListener('change', async e
   await saveHideScores(hideScoresOn, sk.length ? sk[sk.length - 1] : '');
   const msg = document.getElementById('hide-scores-msg');
   msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2000);
+  applySuspenseBlock();
   if (allStats.length) { renderLeaderboard(false); renderTicker(); }
+  if (curView === 'seasons') renderSeasons();
 });
 
 // Le bilan de fin de saison révèle le classement complet : envoyer ce bilan
@@ -1462,7 +1523,9 @@ function revealScoresIfHidden() {
   saveHideScores(false, sk.length ? sk[sk.length - 1] : '');
   const toggle = document.getElementById('hide-scores-toggle');
   if (toggle) toggle.checked = false;
+  applySuspenseBlock();
   if (allStats.length) { renderLeaderboard(false); renderTicker(); }
+  if (curView === 'seasons') renderSeasons();
 }
 
 // Bilan de fin de saison — partagé par le message "classement" (quand la saison
